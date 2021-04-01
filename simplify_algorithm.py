@@ -4,7 +4,7 @@
 # pylint: disable=useless-return
 # pylint: disable=too-few-public-methods
 
-# /***************************************************************************
+# /****************************************************************************
 # simplify_algorithm.py
 # ----------
 # Date                 : April 2021
