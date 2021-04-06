@@ -25,7 +25,7 @@ Unit test for reduce_bend algorithm
 
 import unittest
 from qgis.core import QgsApplication
-from reduce_bend_algorithm import ReduceBend
+from .reduce_bend_algorithm import ReduceBend
 from qgis.core import QgsPoint, QgsLineString, QgsPolygon, QgsFeature, QgsGeometry, QgsProcessingFeedback, \
                       QgsVectorLayer, QgsWkbTypes, QgsPointXY
 from qgis.analysis import QgsNativeAlgorithms
