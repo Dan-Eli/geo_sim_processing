@@ -180,12 +180,139 @@ class Test(unittest.TestCase):
         self.assertTrue (val0, title)
 
     def test_case09(self):
-        title = "Test 09: Closed line in form of triangle"
-        qgs_geom0 = create_line([(0, 0), (5, 5), (10,0), (0,0)])
-        qgs_feature_out = build_and_launch(title,[qgs_geom0], 2)
-        out_qgs_geom0 = create_line([(0, 0), (5, 5), (10,0), (0,0)])
+        title = "Test 09: Closed line in form of triangle, no simplification"
+        qgs_geom0 = create_polygon([(0, 0), (5, 5), (10,0), (0,0)], [])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0], 10)
+        out_qgs_geom0 = create_polygon([(0, 0), (5, 5), (10,0), (0,0)], [])
         val0 = out_qgs_geom0.equals(qgs_feature_out[0])
         self.assertTrue (val0, title)
+
+    def test_case10(self):
+        title = "Test 10: Closed line in form of a square"
+        qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (0,0)], [])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0], 10)
+        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (0,0)], [])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        self.assertTrue (val0, title)
+
+    def test_case11(self):
+        title = "Test 11: Closed line in form of a square"
+        qgs_geom0 = create_polygon([(0, 0), (0,5), (3,6), (5,5), (5,0), (0,0)], [])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0], 10)
+        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (3,6), (5,5), (5,0), (0,0)], [])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        self.assertTrue (val0, title)
+
+    def test_case12(self):
+        title = "Test 12: Closed line in form of a square"
+        qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (2,1), (0,0)], [])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0], 10)
+        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (2,1), (0,0)], [])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        self.assertTrue (val0, title)
+
+    def test_case13(self):
+        title = "Test 13: Closed line in form of a square"
+        qgs_geom0 = create_polygon([(0, 0), (0, 5), (3, 5), (5, 5), (5, 0), (0, 0)], [])
+        qgs_feature_out = build_and_launch(title, [qgs_geom0], 2)
+        out_qgs_geom0 = create_polygon([(0, 0), (0, 5), (5, 5), (5, 0), (0, 0)], [])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        self.assertTrue(val0, title)
+
+    def test_case14(self):
+        title = "Test 14: Closed line in form of a square"
+        qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (2,1), (0,0)], [])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0], 2)
+        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (2,1), (0,0)], [])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        self.assertTrue (val0, title)
+
+    def test_case15(self):
+        title = "Test 15: Open line self intersecting"
+        qgs_geom0 = create_line([(0, 0), (5,0), (5,2), (10,2), (10,0), (50,0), (50, -5), (7,-5), (7,1)])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0], 3)
+        out_qgs_geom0 = create_line([(0, 0), (5,2), (50,0), (50, -5), (7,-5), (7,1)])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        self.assertTrue (val0, title)
+
+    def test_case16(self):
+        title = "Test 16: Open line intersecting another line (no simplification done)"
+        qgs_geom0 = create_line([(0, 0), (2,2), (4,0)])
+        qgs_geom1 = create_line([(2, -1), (2, 1)])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0, qgs_geom1], 3)
+        out_qgs_geom0 = create_line([(0, 0), (2,2), (4,0)])
+        out_qgs_geom1 = create_line([(2, -1), (2, 1)])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        val1 = out_qgs_geom1.equals(qgs_feature_out[1])
+        self.assertTrue (val0 and val1, title)
+
+    def test_case17(self):
+        title = "Test 17: Open line intersecting another line: simplification done"
+        qgs_geom0 = create_line([(0, 1), (3,3), (6,1)])
+        qgs_geom1 = create_line([(0, 0), (3,1.5), (6,0)])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0, qgs_geom1], 3)
+        out_qgs_geom0 = create_line([(0, 1), (6, 1)])
+        out_qgs_geom1 = create_line([(0, 0), (6, 0)])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        val1 = out_qgs_geom1.equals(qgs_feature_out[1])
+        self.assertTrue (val0 and val1, title)
+
+    def test_case18(self):
+        title = "Test 18: Open line intersecting another line: simplification done"
+        qgs_geom0 = create_line([(0, 0), (3, 1.5), (6, 0)])
+        qgs_geom1 = create_line([(0, 1), (3,3), (6,1)])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0, qgs_geom1], 3)
+        out_qgs_geom0 = create_line([(0, 0), (6, 0)])
+        out_qgs_geom1 = create_line([(0, 1), (6, 1)])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        val1 = out_qgs_geom1.equals(qgs_feature_out[1])
+        self.assertTrue (val0 and val1, title)
+
+    def test_case19(self):
+        title = "Test 19: Open line intersecting another line (partial line simplification done)"
+        qgs_geom0 = create_line([(0, 0), (2,2), (4,0), (6,2), (8,0)])
+        qgs_geom1 = create_line([(2, -1), (2, .5)])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0, qgs_geom1], 3)
+        out_qgs_geom0 = create_line([(0, 0), (2,2), (8,0)])
+        out_qgs_geom1 = create_line([(2, -1), (2, .5)])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        val1 = out_qgs_geom1.equals(qgs_feature_out[1])
+        self.assertTrue (val0 and val1, title)
+
+    def test_case20(self):
+        title = "Test 20: Open line intersecting another line (partial line simplification done)"
+        qgs_geom0 = create_line([(0, 0), (2,2), (4,0), (6,2.5), (8,0)])
+        qgs_geom1 = create_line([(6, -1), (6, .5)])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0, qgs_geom1], 3)
+        out_qgs_geom0 = create_line([(0, 0), (6,2.5), (8,0)])
+        out_qgs_geom1 = create_line([(6, -1), (6, .5)])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        val1 = out_qgs_geom1.equals(qgs_feature_out[1])
+        self.assertTrue (val0 and val1, title)
+
+    def test_case21(self):
+        title = "Test 21: Open line with sidedness problem"
+        qgs_geom0 = create_line([(0, 0), (2,2), (4,0)])
+        qgs_geom1 = create_line([(2,.1), (2,.2)])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0, qgs_geom1], 3)
+        out_qgs_geom0 = create_line([(0, 0), (2,2), (4,0)])
+        out_qgs_geom1 = create_line([(2,.1), (2,.2)])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        val1 = out_qgs_geom1.equals(qgs_feature_out[1])
+        self.assertTrue (val0 and val1, title)
+
+    def test_case22(self):
+        title = "Test 22: Open line with sidedness problem"
+        qgs_geom0 = create_line([(0, 0), (2,2), (4,0), (6,2.5), (8,0)])
+        qgs_geom1 = create_line([(2,.1), (2,.2)])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0, qgs_geom1], 3)
+        out_qgs_geom0 = create_line([(0, 0), (6,2.5), (8,0)])
+        out_qgs_geom1 = create_line([(2,.1), (2,.2)])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        val1 = out_qgs_geom1.equals(qgs_feature_out[1])
+        self.assertTrue (val0 and val1, title)
+
+
 
 
 
