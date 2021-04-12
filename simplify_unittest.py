@@ -191,7 +191,7 @@ class Test(unittest.TestCase):
         title = "Test 10: Closed line in form of a square"
         qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (0,0)], [])
         qgs_feature_out = build_and_launch(title,[qgs_geom0], 10)
-        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (0,0)], [])
+        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (0,0)], [])
         val0 = out_qgs_geom0.equals(qgs_feature_out[0])
         self.assertTrue (val0, title)
 
@@ -199,7 +199,7 @@ class Test(unittest.TestCase):
         title = "Test 11: Closed line in form of a square"
         qgs_geom0 = create_polygon([(0, 0), (0,5), (3,6), (5,5), (5,0), (0,0)], [])
         qgs_feature_out = build_and_launch(title,[qgs_geom0], 10)
-        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (3,6), (5,5), (5,0), (0,0)], [])
+        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (0,0)], [])
         val0 = out_qgs_geom0.equals(qgs_feature_out[0])
         self.assertTrue (val0, title)
 
@@ -207,7 +207,7 @@ class Test(unittest.TestCase):
         title = "Test 12: Closed line in form of a square"
         qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (2,1), (0,0)], [])
         qgs_feature_out = build_and_launch(title,[qgs_geom0], 10)
-        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (2,1), (0,0)], [])
+        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,0), (0,0)], [])
         val0 = out_qgs_geom0.equals(qgs_feature_out[0])
         self.assertTrue (val0, title)
 
@@ -223,7 +223,7 @@ class Test(unittest.TestCase):
         title = "Test 14: Closed line in form of a square"
         qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (2,1), (0,0)], [])
         qgs_feature_out = build_and_launch(title,[qgs_geom0], 2)
-        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (2,1), (0,0)], [])
+        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (0,0)], [])
         val0 = out_qgs_geom0.equals(qgs_feature_out[0])
         self.assertTrue (val0, title)
 

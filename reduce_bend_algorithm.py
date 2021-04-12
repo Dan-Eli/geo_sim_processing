@@ -87,7 +87,7 @@ class ReduceBendAlgorithm(QgsProcessingAlgorithm):
     Reduce bend also accept multi lines and multi polygons but will output lines and polygons.
 
     <b>Usage</b>
-    <u>Input layer</u> : Any LineString or Polygon layer.  Multi geometry are transformed into single geometry.
+    <u>Input layer</u> : Any LineString or Polygon layer.  Multi geometry are transformed into single part geometry.
     <u>Diameter tolerance</u>: Theoretical diameter of a bend to remove.
     <u>Smooth line</u>: If you want to smooth the reduced bends (when possible).
     <u>Exclude hole</u>: If you want to exclude (delete )holes below the diameter of the bend.

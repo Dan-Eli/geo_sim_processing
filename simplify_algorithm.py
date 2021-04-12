@@ -34,9 +34,8 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.core import (QgsProcessing, QgsProcessingAlgorithm, QgsProcessingParameterDistance,
                        QgsProcessingParameterFeatureSource, QgsProcessingParameterFeatureSink,
-                       QgsProcessingParameterBoolean, QgsFeatureSink, QgsFeatureRequest, QgsPoint,
-                       QgsPointXY, QgsLineString, QgsPolygon, QgsWkbTypes, QgsGeometry,
-                       QgsGeometryUtils, QgsRectangle, QgsProcessingException, QgsGeometryEngine)
+                       QgsProcessingParameterBoolean, QgsFeatureSink, QgsFeatureRequest,
+                       QgsLineString, QgsPolygon, QgsWkbTypes, QgsGeometry, QgsProcessingException)
 import processing
 from .geo_sim_util import Epsilon, GsCollection, GsFeature, GsPolygon, GsLineString, GsPoint
 
@@ -79,7 +78,24 @@ class SimplifyAlgorithm(QgsProcessingAlgorithm):
         """Returns a localised short help string for the algorithm.
         """
         help_str = """
-    Simplify is a geospatial simplification and generalization tool for lines and polygons...
+    Simplify is a geospatial simplification and generalization tool for lines and polygons. The \
+    particularity of this algorithm is that for each line or polygon it analyzes its bends (curves) and \
+    decides which one to reduce, trying to emulate what a cartographer would do manually \
+    to simplify or generalize a line. Reduce bend will accept lines and polygons as input.  Reduce bend will \
+    preserve the topology (spatial relations) within and between the features during the bend reduction. \
+    Reduce bend also accept multi lines and multi polygons but will output lines and polygons.
+
+    <b>Usage</b>
+    <u>Input layer</u> : Any LineString or Polygon layer.  Multi geometry are transformed into single part geometry.
+    <u>Tolerance</u>: Tolerance used for line simplification.
+    <u>Simplified</u> : Output layer of the algorithm.
+
+    <b>Rule of thumb for the diameter tolerance</b>
+    Reduce bend can be used for line simplifying in the context of line generalization. The big \
+    question will often be what diameter should we use? A good starting point is the cartographic rule of \
+    thumb -- the .5mm on the map -- which says that the minimum distance between two lines should be \
+    greater than 0.5mm on a paper map. So to simplify (generalize) a line for representation at a scale of \
+    1:50 000 for example a diameter of 25m should be a good starting point
 
     """
 
@@ -119,7 +135,7 @@ class SimplifyAlgorithm(QgsProcessingAlgorithm):
         # 'OUTPUT' for the results
         self.addParameter(QgsProcessingParameterFeatureSink(
                           'OUTPUT',
-                          self.tr('Reduced bend')))
+                          self.tr('Simplified')))
 
     def processAlgorithm(self, parameters, context, feedback):
         """Main method that extract parameters and call ReduceBend algorithm.
@@ -488,25 +504,27 @@ class Simplify:
             sim_geoms += rb_feature.get_rb_geom()
 
         # Find the 2 most distant vertice in a closed geometry
-        for sim_geom in sim_geoms:
-            qgs_line_string = sim_geom.qgs_geom.constGet()
-            if qgs_line_string.isClosed():
-                qgs_oriented_bbox = sim_geom.qgs_geom.orientedMinimumBoundingBox()
-                qgs_geom_bbox = qgs_oriented_bbox[0]
-                qgs_points_bbox = qgs_geom_bbox.constGet().exteriorRing().points()  # Extract vertice of the bounding box
-                length_axis_0 = qgs_points_bbox[0].distance(qgs_points_bbox[1])
-                length_axis_1 = qgs_points_bbox[1].distance(qgs_points_bbox[2])
-                if length_axis_0 < length_axis_1:
-                    # Find the two shortest sides of the bounding box
-                    qgs_geom_line0 = QgsGeometry(QgsLineString(qgs_points_bbox[0], qgs_points_bbox[1]))
-                    qgs_geom_line1 = QgsGeometry(QgsLineString(qgs_points_bbox[2], qgs_points_bbox[3]))
-                else:
-                    qgs_geom_line0 = QgsGeometry(QgsLineString(qgs_points_bbox[1], qgs_points_bbox[2]))
-                    qgs_geom_line1 = QgsGeometry(QgsLineString(qgs_points_bbox[3], qgs_points_bbox[4]))
-                qgs_points = qgs_line_string.points()
-                distances_line0 = [qgs_geom_line0.distance(QgsGeometry(qgs_point.clone())) for qgs_point in qgs_points]
-                distances_line1 = [qgs_geom_line1.distance(QgsGeometry(qgs_point.clone())) for qgs_point in qgs_points]
-                new_start_end = distances_line0.index(max(distances_line0))
+
+#        for sim_geom in sim_geoms:
+#            qgs_line_string = sim_geom.qgs_geom.constGet()
+#            if qgs_line_string.isClosed():
+#                qgs_oriented_bbox = sim_geom.qgs_geom.orientedMinimumBoundingBox()
+#                qgs_geom_bbox = qgs_oriented_bbox[0]
+#                qgs_points_bbox = qgs_geom_bbox.constGet().exteriorRing().points()  # Extract vertice of the bounding box
+#                length_axis_0 = qgs_points_bbox[0].distance(qgs_points_bbox[1])
+#                length_axis_1 = qgs_points_bbox[1].distance(qgs_points_bbox[2])
+#                if length_axis_0 < length_axis_1:
+#                    # Find the two shortest sides of the bounding box
+#                    qgs_geom_line0 = QgsGeometry(QgsLineString(qgs_points_bbox[0], qgs_points_bbox[1]))
+#                    qgs_geom_line1 = QgsGeometry(QgsLineString(qgs_points_bbox[2], qgs_points_bbox[3]))
+#                else:
+#                    qgs_geom_line0 = QgsGeometry(QgsLineString(qgs_points_bbox[1], qgs_points_bbox[2]))
+#                    qgs_geom_line1 = QgsGeometry(QgsLineString(qgs_points_bbox[3], qgs_points_bbox[4]))
+#                qgs_points = qgs_line_string.points()
+#                distances_line0 = [qgs_geom_line0.distance(QgsGeometry(qgs_point.clone())) for qgs_point in qgs_points]
+#                distances_line1 = [qgs_geom_line1.distance(QgsGeometry(qgs_point.clone())) for qgs_point in qgs_points]
+#                new_start_end = distances_line0.index(max(distances_line0))
+
 
                 # Open line string
 ###                sim_geom.farthest_index = distances_line1.index(max(distances_line1))
@@ -539,12 +557,6 @@ class Simplify:
                 if i % 100 == 0:
                     self.feedback.setProgress(int(i/len(self.rb_geoms)*100))
                 if not rb_geom.is_simplest:  # Only process geometry that are not at simplest form
-#                    nbr_vertice_deleted = ReduceBend.detect_bends(rb_geom)
-#                    if rb_geom.need_pivot:
-#                        #  Pivoting a closed line moves the first/last vertice on a bend that do not need simplification
-#                        ReduceBend.pivot_closed_line(rb_geom, self.diameter_tol)
-#                        nbr_bend_detected = ReduceBend.detect_bends(rb_geom)  # Bend detection needed after pivot
-#                    ReduceBend.flag_bend_to_reduce(rb_geom, self.diameter_tol)
                     nbr_vertice_deleted += self.process_line(rb_geom)
 
 #            self.rb_results.nbr_vertice_deleted.append(nbr_vertice_deleted)
@@ -569,47 +581,6 @@ class Simplify:
                 nbr_done += 1
 
         return nbr_done
-
-#    def delete_co_linear(self, rb_geom):
-#        """Delete co-linear vertice on a LineString
-#
-#        This method delete co-linear and near co-linear vertice because they are unnecessary but moreover in certain
-#        condition when they are forming near 0 (empty) area these vertices are creating spatial calculus errors
-#
-#        :param: RbGeom rb_geom: Geometry to delete co-linear vertices
-#        """
-#
-#        # Build the list of angles for each vertice
-#        vertex_ids_to_del = []
-#        angles = ReduceBend.get_angles(rb_geom.qgs_geom.constGet())
-#        if rb_geom.qgs_geom.constGet().isClosed() and len(angles) >= 1:
-#            del angles[0]  # Do not process the start/end vertice (even if co-linear)
-#        for i, angle in enumerate(angles):
-#            if abs(angle - math.pi) <= Epsilon.ZERO_ANGLE or abs(angle) <= Epsilon.ZERO_ANGLE:
-#                # Co-linear point or flat angle delete the current point
-#                vertex_ids_to_del.append(i+1)
-#
-#        # Delete co-linear vertex
-#        for vertex_id_to_del in reversed(vertex_ids_to_del):
-#            self.rb_collection.delete_vertex(rb_geom, vertex_id_to_del, vertex_id_to_del)
-#
-#        # Special case to process closed line string to find ans delete co-linear points at the first/last vertice
-#        if rb_geom.qgs_geom.constGet().isClosed():
-#            num_points = rb_geom.qgs_geom.constGet().numPoints()
-#            if num_points >= 5:  # Minimum of 5 vertices are needed to have co-linear vertices in closed line
-#                qgs_ls = QgsLineString([rb_geom.qgs_geom.vertexAt(num_points-2),
-#                                        rb_geom.qgs_geom.vertexAt(0),
-#                                        rb_geom.qgs_geom.vertexAt(1)])
-#                angles = ReduceBend.get_angles(qgs_ls)
-#                angle = angles[0]
-#                if abs(angle - math.pi) <= Epsilon.ZERO_ANGLE or abs(angle) <= Epsilon.ZERO_ANGLE:
-#                    self.rb_collection.delete_vertex(rb_geom, 0, 0)
-#
-#        if rb_geom.qgs_geom.length() <= Epsilon.ZERO_RELATIVE:
-#            # Something wrong.  do not try to simplify the LineString
-#            rb_geom.is_simplest = True
-#
-#        return
 
     def validate_constraints(self, sim_geom, first, last):
         """Validate the spatial relationship in order maintain topological structure
@@ -636,6 +607,14 @@ class Simplify:
 
         constraints_valid = True
 
+        # Check if this simplification will create degenerated area (area with 3 points)
+        qgs_line_string = sim_geom.qgs_geom.constGet()
+        if qgs_line_string.isClosed():
+            num_points = qgs_line_string.numPoints()
+            if num_points - (last-first-1) <= 3:
+                # Not enough point remaining to simplify the line
+                return False
+
         qgs_points = [sim_geom.qgs_geom.vertexAt(i) for i in range(first, last+1)]
         qgs_geom_new_subline = QgsGeometry(QgsLineString(qgs_points[0], qgs_points[-1]))
         qgs_geom_old_subline = QgsGeometry(QgsLineString(qgs_points))
@@ -655,12 +634,12 @@ class Simplify:
             self.feedback.pushInfo(text)
 
         # Second: check that the new line does not intersect any other line or points
-        if constraints_valid:
+        if constraints_valid and len(qgs_geoms_with_others) >= 1:
             constraints_valid = Simplify.validate_intersection(qgs_geoms_with_others, qgs_geom_new_subline)
 
         # Third: check that inside the bend to reduce there is no feature completely inside it.  This would cause a
         # sidedness or relative position error
-        if constraints_valid:
+        if constraints_valid and len(qgs_geoms_with_others) >= 1:
             qgs_ls_old_subline = QgsLineString(qgs_points)
             qgs_ls_old_subline.addVertex(qgs_points[0])  # Close the line with the start point
             qgs_geom_old_subline = QgsGeometry(qgs_ls_old_subline.clone())
@@ -697,18 +676,19 @@ class Simplify:
         stack = []  # Stack to simulate the recursion
         sim_geom.is_simplest = True
         qgs_line_string = sim_geom.qgs_geom.constGet()
-        num_points = qgs_line_string.numPoints()
+        qgs_points = qgs_line_string.points()
+        num_points = len(qgs_points)
         last = num_points-1
         if qgs_line_string.isClosed():
             # Initialize stack for a closed line string
             if num_points >= 5:
                 mid_index = (num_points // 2)
-                (farthest_index, farthest_dist) = self._find_farthest_point(qgs_line_string, 0, mid_index)
-                if farthest_dist > self.tolerance:
-                    stack.append((0, mid_index))
-                (farthest_index, farthest_dist) = self._find_farthest_point(qgs_line_string, mid_index, last)
-                if farthest_dist > self.tolerance:
-                    stack.append((mid_index, num_points-1))
+#                (farthest_index, farthest_dist) = self._find_farthest_point(sim_geom.qgs_geom, 0, mid_index)
+#                if farthest_dist > self.tolerance:
+                stack.append((0, mid_index))
+#                (farthest_index, farthest_dist) = self._find_farthest_point(sim_geom.qgs_geom, mid_index, last)
+#                if farthest_dist > self.tolerance:
+                stack.append((mid_index, num_points-1))
             else:
                 # Cannot simplify a line with so few vertice
                 pass
@@ -720,7 +700,7 @@ class Simplify:
         while stack:
             (first, last) = stack.pop()
             if first + 1 < last:  # The segment to check has only 2 points
-                (farthest_index, farthest_dist) = self._find_farthest_point(qgs_line_string, first, last)
+                (farthest_index, farthest_dist) = self._find_farthest_point(qgs_points, first, last)
                 if farthest_dist <= self.tolerance:
                     if self.validate_constraints(sim_geom, first, last):
                         nbr_vertice_deleted += last - first - 1
@@ -728,7 +708,7 @@ class Simplify:
                     else:
                         sim_geom.is_simplest = False  # The line string is not at its simplest form
                         # In case of non respect of spatial constraints split and stack again the sub lines
-                        (farthest_index, farthest_dist) = self._find_farthest_point(qgs_line_string, first, last)
+                        (farthest_index, farthest_dist) = self._find_farthest_point(qgs_points, first, last)
                         if farthest_dist <= self.tolerance:
                             stack.append((first, farthest_index))
                             stack.append((farthest_index, last))
@@ -779,7 +759,7 @@ class Simplify:
 
         return nbr_vertice_deleted
 
-    def _find_farthest_point(self, qgs_line_string, first, last):
+    def _find_farthest_point(self, qgs_points, first, last, ):
         """
         Returns a tuple with the farthest point's index and it's distance of a line's section
 
@@ -791,11 +771,11 @@ class Simplify:
         """
 
         if last-first >= 2:
-            qgs_pnt_first = qgs_line_string.pointN(first)
-            qgs_pnt_last = qgs_line_string.pointN(last)
-            qgs_geom_first_last = QgsLineString(qgs_pnt_first, qgs_pnt_last)
+#            qgs_pnt_first = qgs_geom_line.vertexAt(first)
+#            qgs_pnt_last = qgs_geom_line.vertexAt(last)
+            qgs_geom_first_last = QgsLineString(qgs_points[first], qgs_points[last])
             qgs_geom_engine = QgsGeometry.createGeometryEngine(qgs_geom_first_last)
-            distances = [qgs_geom_engine.distance(qgs_line_string.pointN(i)) for i in range(first+1, last)]
+            distances = [qgs_geom_engine.distance(qgs_points[i]) for i in range(first+1, last)]
             farthest_dist = max(distances)
             farthest_index = distances.index(farthest_dist) + first + 1
         else:
