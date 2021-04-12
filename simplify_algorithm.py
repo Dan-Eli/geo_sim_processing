@@ -26,10 +26,9 @@
 QGIS Plugin for Bend reduction
 """
 
-
+from .geo_sim_util import Epsilon, GsCollection, GsFeature, GsPolygon, GsLineString, GsPoint
 import os
 import inspect
-import math
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.core import (QgsProcessing, QgsProcessingAlgorithm, QgsProcessingParameterDistance,
@@ -37,7 +36,6 @@ from qgis.core import (QgsProcessing, QgsProcessingAlgorithm, QgsProcessingParam
                        QgsProcessingParameterBoolean, QgsFeatureSink, QgsFeatureRequest,
                        QgsLineString, QgsPolygon, QgsWkbTypes, QgsGeometry, QgsProcessingException)
 import processing
-from .geo_sim_util import Epsilon, GsCollection, GsFeature, GsPolygon, GsLineString, GsPoint
 
 
 class SimplifyAlgorithm(QgsProcessingAlgorithm):
@@ -655,12 +653,13 @@ class Simplify:
 
     def process_line(self, sim_geom):
         """
-        This method is simplifying a line with the Douglas Peucker algorithm plus contraints checking if they are enabled.
+        This method is simplifying a line with the Douglas Peucker algorithm and spatial constraints.
 
-        This method is checking the line differently the first time from the remaining time.  The idea behind it is only to
-        have a faster process. We assume that most of the lines will not have a problem so we check for problems (SIMPLE_LINE,
-        CROSSING_LINE and SIDEDNESS) against the whole line for the first time. If there are some problems tthe next time we will
-        check each sub portion of the line. This strategy is making a huge difference in time.
+        This method is checking the line differently the first time from the remaining time.  The idea behind
+        it is only to have a faster process. We assume that most of the lines will not have a problem so we
+        check for problems (SIMPLE_LINE, CROSSING_LINE and SIDEDNESS) against the whole line for the first time.
+        If there are some problems the next time we will  check each sub portion of the line.
+        This strategy is making a huge difference in time.
 
         Parameters:
             line: The line to process
@@ -715,47 +714,6 @@ class Simplify:
                 else:
                     stack.append((first, farthest_index))
                     stack.append((farthest_index, last))
-
-#        new_vertice = list(index)
-#        new_qgs_points = [sim_geom.qgs_geom.vertexAt(i) for i in new_vertice]
-#        dummy = sim_geom.qgs_geom
-#        sim_geom.qgs_geom = QgsGeometry(QgsLineString(new_qgs_points))
-
-#        if (line.is_closed and (len(replacement_index) <= 3)):
-#            #           Closed line must have at least 4 vertices
-#            replacement_index = self._process_closed_line(line)
-#
-#        # Check if the line has been simplified
-#        nbr_vertice_simplified = len(line.coords_dual) - len(replacement_index)
-#        if nbr_vertice_simplified == 0:
-#            simplified = False  # No change done (same quantity of coordinates)
-#            line.is_simplest = True  # The line is at its simplest form
-#        else:
-#            new_coords = [line.coords_dual[i] for i in sorted(replacement_index)]
-#            if (pass_nbr != 0):
-##                # If we process each sub modifification of the line inividually
-#                simplified = True  # The line has been simplified
-#            else:
-#                # For the first iteration we process the line as a whole
-#                # Check for conglict
-#                line_simple_line = LineString(new_coords)
-#                new_segment_coords = new_coords
-#                old_segment_coords = line.coords_dual
-#                line_crossing_line = LineString(new_segment_coords)
-#                sidedness_polygon = GenUtil.calculate_sidedness_polygon(LineString(old_segment_coords),
-#                                                                        LineString(new_segment_coords))
-
-#                conflict_type = GenUtil.test_constraints(self, None, line_simple_line, line_crossing_line,
-#                                                         sidedness_polygon, self.s_container, line._sci_id)
-#                if (conflict_type is None):
-#                    simplified = True  # The line was  simplified
-#                    line.is_simplest = True  # If at the first pass the whole line as no conflict it is at its simplest form
-#                else:
-#                    simplified = False  # The line was not simplified#
-#
-#            if (simplified):
-#                for i in xrange(nbr_vertice_simplified): self.stats.add_stats(_ALGO)
-#                line.update_coords(new_coords, self.s_container)
 
         return nbr_vertice_deleted
 
