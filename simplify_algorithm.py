@@ -23,10 +23,10 @@
 #  ***************************************************************************/
 
 """
-QGIS Plugin for Bend reduction
+QGIS Plugin for Simplification (Douglas-Peucker algorithm)
 """
 
-from .geo_sim_util import Epsilon, GsCollection, GsFeature, GsPolygon, GsLineString, GsPoint
+from .geo_sim_util import Epsilon, GsCollection, GsFeature, GsPolygon, GsLineString, GsPoint, GeoSimUtil
 import os
 import inspect
 from qgis.PyQt.QtCore import QCoreApplication
@@ -124,12 +124,6 @@ class SimplifyAlgorithm(QgsProcessingAlgorithm):
                           defaultValue=0.0,
                           parentParameterName='INPUT'))  # Make distance units match the INPUT layer units
 
-        # 'VERBOSE' mode for more output information
-        self.addParameter(QgsProcessingParameterBoolean(
-            'VERBOSE',
-            self.tr('Verbose'),
-            defaultValue=False))
-
         # 'OUTPUT' for the results
         self.addParameter(QgsProcessingParameterFeatureSink(
                           'OUTPUT',
@@ -145,7 +139,6 @@ class SimplifyAlgorithm(QgsProcessingAlgorithm):
         source_in = self.parameterAsSource(parameters, "INPUT", context)
         tolerance = self.parameterAsDouble(parameters, "TOLERANCE", context)
         validate_structure = self.parameterAsBool(parameters, "VALIDATE_STRUCTURE", context)
-        verbose = self.parameterAsBool(parameters, "VERBOSE", context)
 
         if source_in is None:
             raise QgsProcessingException(self.invalidSourceError(parameters, "INPUT"))
@@ -179,21 +172,17 @@ class SimplifyAlgorithm(QgsProcessingAlgorithm):
             sink.addFeature(qgs_feature_out, QgsFeatureSink.FastInsert)
 
         # Push some output statistics
+        feedback.pushInfo(" ")
         feedback.pushInfo("Number of features in: {0}".format(rb_return.in_nbr_features))
         feedback.pushInfo("Number of features out: {0}".format(rb_return.out_nbr_features))
         feedback.pushInfo("Number of iteration needed: {0}".format(rb_return.nbr_pass))
-        feedback.pushInfo("Number of vertice deleted: {0}".format(rb_return.nbr_vertice_deleted))
+        feedback.pushInfo("Total vertice deleted: {0}".format(rb_return.nbr_vertice_deleted))
         if validate_structure:
             if rb_return.is_structure_valid:
                 status = "Valid"
             else:
                 status = "Invalid"
             feedback.pushInfo("Debug - State of the internal data structure: {0}".format(status))
-        if verbose:
-            for i in range(rb_return.nbr_pass):
-                str_value = "Iteration: {}; Bends detected: {}; Bend reduced: {}" \
-                            .format(i, rb_return.nbr_bend_detected[i], rb_return.nbr_bend_reduced[i])
-                feedback.pushInfo("Verbose - {0}".format(str_value))
 
         return {"OUTPUT": dest_id}
 
@@ -275,14 +264,14 @@ class Simplify:
 
     @staticmethod
     def douglas_peucker(qgs_in_features, tolerance, validate_structure=False, feedback=None):
-        """Main static method used to launch the bend reduction.
+        """Main static method used to launch the simplification of the Douglas-Peucker algorithm.
 
-        :param: [QgsFeatures] qgs_features: List of features to process.
-        :param: tolerance: Simplification tolerance.
-        :param: Bool validate_structure: Validate internal data structure after processing (for debugging)
-        :param: QgsFeedback feedback: Handle for interaction with QGIS.
-        :return: Statistics and result object.
-        :rtype: RbResult
+        :param: qgs_features: List of QgsFeatures to process.
+        :param: tolerance: Simplification tolerance in ground unit.
+        :param: validate_structure: Validate internal data structure after processing (for debugging only)
+        :param: feedback: QgsFeedback handle for interaction with QGIS.
+        :return: Statistics and results object.
+        :rtype: RbResults
         """
 
         dp = Simplify(qgs_in_features, tolerance, validate_structure, feedback)
@@ -291,100 +280,32 @@ class Simplify:
         return results
 
     @staticmethod
-    def create_polygon(i, j, qgs_points):
-        """This method create a polygon from a subset of point (vertice)
+    def find_farthest_point(qgs_points, first, last, ):
+        """
+        Returns a tuple with the farthest point's index and it's distance of a line's section
 
-        Note: The first vertice is also the last vertice
+        Parameters:
+            - line: The line to process
+            - first: Index of the first point the line's section to test
+            - last: Index of the last point the line's section to test
 
-        :param: i: Start of point in the list
-        :param: j: End of point in the list
-        :param: qgs_points: List of QgsPoint
-        :return: A polygon formed by a subset of the list of QgsPoint
-        :rtype: QgsPolygon
         """
 
-        # Create the list of point to create
-        if i < j:
-            index = list(range(i, j+1)) + [i]
+        if last - first >= 2:
+            qgs_geom_first_last = QgsLineString(qgs_points[first], qgs_points[last])
+            qgs_geom_engine = QgsGeometry.createGeometryEngine(qgs_geom_first_last)
+            distances = [qgs_geom_engine.distance(qgs_points[i]) for i in range(first + 1, last)]
+            farthest_dist = max(distances)
+            farthest_index = distances.index(farthest_dist) + first + 1
         else:
-            index = list(range(i, len(qgs_points))) + list(range(0, j+1)) + [i]  # Manage circular array
+            # Not enough vertice to calculate the farthest distance
+            farthest_dist = 0
+            farthest_index = first
 
-        qgs_sub_points = [qgs_points[k] for k in index]
-        qgs_polygon = QgsPolygon(QgsLineString(qgs_sub_points))
-
-        return qgs_polygon
-
-    @staticmethod
-    def validate_simplicity(qgs_geoms_with_itself, qgs_geom_new_subline):
-        """Validate the simplicitity constraint
-
-        This constraint assure that the new sub line is not intersecting with any other segment of the same line
-
-        :param: qgs_geoms_with_itself: List of QgsLineString segment to verify for self intersection
-        :param: qgs_geom_new_subline: New QgsLineString replacement sub line.
-        :return: Flag indicating if the spatial constraint is valid
-        :rtype: Bool
-        """
-
-        constraints_valid = True
-        geom_engine_subline = QgsGeometry.createGeometryEngine(qgs_geom_new_subline.constGet().clone())
-        for qgs_geom_potential in qgs_geoms_with_itself:
-            de_9im_pattern = geom_engine_subline.relate(qgs_geom_potential.constGet().clone())
-            # de_9im_pattern[0] == '0' means that their interiors intersect (crosses)
-            # de_9im_pattern[1] == '0' means that one extremity is touching the interior of the other (touches)
-            if de_9im_pattern[0] == '0' or de_9im_pattern[1] == '0':
-                # The new sub line intersect or touch with itself. The result would create a non OGC simple line
-                constraints_valid = False
-                break
-
-        return constraints_valid
-
-    @staticmethod
-    def validate_intersection(qgs_geom_with_others, qgs_geom_new_subline):
-        """Validate the intersection constraint
-
-        This constraint assure that the new sub line is not intersecting with any other lines (not itself)
-
-        :param: qgs_geoms_with_others: List of QgsLineString segment to verify for intersection
-        :param: qgs_geom_new_subline: New QgsLineString replacement sub line.
-        :return: Flag indicating if the spatial constraint is valid
-        :rtype: Bool
-        """
-
-        constraints_valid = True
-        for qgs_geom_potential in qgs_geom_with_others:
-            if not qgs_geom_potential.disjoint(qgs_geom_new_subline):
-                # The bend area intersects with a point
-                constraints_valid = False
-                break
-
-        return constraints_valid
-
-    @staticmethod
-    def validate_sidedness(qgs_geom_with_others, qgs_geom_bend):
-        """Validate the sidedness constraint
-
-        This constraint assure that the new sub line will not change the relative position of an object compared to
-        the polygon formed by the bend to reduce. ex.: an interior ring of a polygon going outside of the exterior ring.
-
-        :param: qgs_geoms_with_others: List of QgsLineString segment to verify for intersection
-        :param: qgs_geom_bend: QgsPolygon formed by the bend to reduce
-        :return: Flag indicating if the spatial constraint is valid
-        :rtype: Bool
-        """
-
-        constraints_valid = True
-        for qgs_geom_potential in qgs_geom_with_others:
-            if qgs_geom_bend.contains(qgs_geom_potential):
-                # A feature is totally located inside
-                constraints_valid = False
-                break
-
-        return constraints_valid
+        return farthest_index, farthest_dist
 
     __slots__ = ('qgs_in_features', 'tolerance', 'validate_structure', 'feedback', 'rb_collection', 'eps',
-                 'rb_results', 'rb_features', 'rb_geoms',
-                 'bends_reduced')
+                 'rb_results', 'rb_geoms', 'gs_features')
 
     def __init__(self, qgs_in_features, tolerance, validate_structure, feedback):
         """Constructor for the bend reduction.
@@ -399,10 +320,9 @@ class Simplify:
         self.tolerance = tolerance
         self.validate_structure = validate_structure
         self.feedback = feedback
-        self.bends_reduced = []  # List containing the reduced bend
         self.eps = None
         self.rb_results = None
-        self.rb_features = None
+        self.gs_features = None
         self.rb_geoms = None
         self.rb_collection = None
 
@@ -413,13 +333,11 @@ class Simplify:
         :rtype: RbResult
         """
 
-
         #  Code used for the profiler (uncomment if needed)
         import cProfile, pstats, io
         from pstats import SortKey
         pr = cProfile.Profile()
         pr.enable()
-
 
         # Calculates the epsilon and initialize some stats and results value
         self.eps = Epsilon(self.qgs_in_features)
@@ -427,7 +345,7 @@ class Simplify:
         self.rb_results = RbResults()
 
         # Create the list of GsPolygon, GsLineString and GsPoint to process
-        self.rb_features = self.create_rb_feature()
+        self.gs_features = GeoSimUtil.create_gs_feature(self.qgs_in_features)
         self.rb_results.in_nbr_features = len(self.qgs_in_features)
 
         # Pre process the LineString: remove to close point and co-linear points
@@ -441,7 +359,7 @@ class Simplify:
         self._simplify_lines()
 
         # Recreate the QgsFeature
-        qgs_features_out = [rb_feature.get_qgs_feature() for rb_feature in self.rb_features]
+        qgs_features_out = [gs_feature.get_qgs_feature() for gs_feature in self.gs_features]
 
         # Set return values
         self.rb_results.out_nbr_features = len(qgs_features_out)
@@ -463,29 +381,6 @@ class Simplify:
 
         return self.rb_results
 
-    def create_rb_feature(self):
-        """Create the different GsFeatures from the QgsFeatures.
-
-        :return: List of rb_features
-        :rtype: [GsFeature]
-        """
-
-        rb_features = []
-
-        for qgs_feature in self.qgs_in_features:
-            qgs_geom = qgs_feature.geometry()  # extract the Geometry
-
-            if GsFeature.is_polygon(qgs_geom.wkbType()):
-                rb_features.append(GsPolygon(qgs_feature))
-            elif GsFeature.is_line_string(qgs_geom.wkbType()):
-                rb_features.append(GsLineString(qgs_feature))
-            elif GsFeature.is_point(qgs_geom.wkbType()):
-                rb_features.append(GsPoint(qgs_feature))
-            else:
-                raise QgsProcessingException("Internal geometry error")
-
-        return rb_features
-
     def pre_simplification_process(self):
         """This method execute the pre simplification process
 
@@ -498,8 +393,8 @@ class Simplify:
 
         # Create the list of RbGeom ==> List of geometry to simplify
         sim_geoms = []
-        for rb_feature in self.rb_features:
-            sim_geoms += rb_feature.get_rb_geom()
+        for gs_feature in self.gs_features:
+            sim_geoms += gs_feature.get_rb_geom()
 
         # Find the 2 most distant vertice in a closed geometry
 
@@ -545,40 +440,29 @@ class Simplify:
 
         """
 
-        nbr_geoms = 100.0 / len(self.rb_geoms) if len(self.rb_geoms) >= 1 else 0
         while True:
-            self.feedback.setProgress(max(1, int(self.count_rb_geoms_done() * nbr_geoms)))
+            progress_bar_value = 0
+            self.rb_results.nbr_pass += 1
+            self.feedback.pushInfo("Iteration: {0}".format(self.rb_results.nbr_pass))
+            self.feedback.setProgress(progress_bar_value)
             nbr_vertice_deleted = 0
             for i, rb_geom in enumerate(self.rb_geoms):
                 if self.feedback.isCanceled():
                     break
-                if i % 100 == 0:
-                    self.feedback.setProgress(int(i/len(self.rb_geoms)*100))
+                new_progress_bar_value = int(i/len(self.rb_geoms)*100)
+                if new_progress_bar_value > progress_bar_value:
+                    progress_bar_value = new_progress_bar_value
+                    self.feedback.setProgress(progress_bar_value)
                 if not rb_geom.is_simplest:  # Only process geometry that are not at simplest form
                     nbr_vertice_deleted += self.process_line(rb_geom)
 
-#            self.rb_results.nbr_vertice_deleted.append(nbr_vertice_deleted)
-
+            self.feedback.pushInfo("Vertice deleted: {0}".format(nbr_vertice_deleted))
             # While loop breaking condition
-            print ('nbr_vertice_deleted: ', nbr_vertice_deleted)
             if nbr_vertice_deleted == 0:
                 break
-            self.rb_results.nbr_pass += 1
             self.rb_results.nbr_vertice_deleted += nbr_vertice_deleted
 
         return
-
-    def count_rb_geoms_done(self):
-        """Count the number of geometry  that are at there simplest form
-
-        """
-
-        nbr_done = 0
-        for rb_geom in self.rb_geoms:
-            if rb_geom.is_simplest:
-                nbr_done += 1
-
-        return nbr_done
 
     def validate_constraints(self, sim_geom, first, last):
         """Validate the spatial relationship in order maintain topological structure
@@ -623,7 +507,7 @@ class Simplify:
         # First: check if the bend reduce line string is an OGC simple line
         # We test with a tiny smaller line to ease the testing and false positive error
         if qgs_geom_new_subline.length() >= Epsilon.ZERO_RELATIVE:
-            constraints_valid = Simplify.validate_simplicity(qgs_geoms_with_itself, qgs_geom_new_subline)
+            constraints_valid = GeoSimUtil.validate_simplicity(qgs_geoms_with_itself, qgs_geom_new_subline)
         else:
             # Error in the input file
             x = qgs_points[0].x()
@@ -633,7 +517,7 @@ class Simplify:
 
         # Second: check that the new line does not intersect any other line or points
         if constraints_valid and len(qgs_geoms_with_others) >= 1:
-            constraints_valid = Simplify.validate_intersection(qgs_geoms_with_others, qgs_geom_new_subline)
+            constraints_valid = GeoSimUtil.validate_intersection(qgs_geoms_with_others, qgs_geom_new_subline)
 
         # Third: check that inside the bend to reduce there is no feature completely inside it.  This would cause a
         # sidedness or relative position error
@@ -644,7 +528,7 @@ class Simplify:
             qgs_geom_unary = QgsGeometry.unaryUnion([qgs_geom_old_subline])  # Create node at each overlap
             qgs_geom_polygonize = QgsGeometry.polygonize([qgs_geom_unary])
             if qgs_geom_polygonize.isSimple():
-                constraints_valid = Simplify.validate_sidedness(qgs_geoms_with_others, qgs_geom_polygonize)
+                constraints_valid = GeoSimUtil.validate_sidedness(qgs_geoms_with_others, qgs_geom_polygonize)
             else:
                 print ("polygonize not valid")
                 constraints_valid = False
@@ -682,11 +566,7 @@ class Simplify:
             # Initialize stack for a closed line string
             if num_points >= 5:
                 mid_index = (num_points // 2)
-#                (farthest_index, farthest_dist) = self._find_farthest_point(sim_geom.qgs_geom, 0, mid_index)
-#                if farthest_dist > self.tolerance:
                 stack.append((0, mid_index))
-#                (farthest_index, farthest_dist) = self._find_farthest_point(sim_geom.qgs_geom, mid_index, last)
-#                if farthest_dist > self.tolerance:
                 stack.append((mid_index, num_points-1))
             else:
                 # Cannot simplify a line with so few vertice
@@ -699,7 +579,7 @@ class Simplify:
         while stack:
             (first, last) = stack.pop()
             if first + 1 < last:  # The segment to check has only 2 points
-                (farthest_index, farthest_dist) = self._find_farthest_point(qgs_points, first, last)
+                (farthest_index, farthest_dist) = Simplify.find_farthest_point(qgs_points, first, last)
                 if farthest_dist <= self.tolerance:
                     if self.validate_constraints(sim_geom, first, last):
                         nbr_vertice_deleted += last - first - 1
@@ -707,7 +587,7 @@ class Simplify:
                     else:
                         sim_geom.is_simplest = False  # The line string is not at its simplest form
                         # In case of non respect of spatial constraints split and stack again the sub lines
-                        (farthest_index, farthest_dist) = self._find_farthest_point(qgs_points, first, last)
+                        (farthest_index, farthest_dist) = Simplify.find_farthest_point(qgs_points, first, last)
                         if farthest_dist <= self.tolerance:
                             stack.append((first, farthest_index))
                             stack.append((farthest_index, last))
@@ -716,29 +596,3 @@ class Simplify:
                     stack.append((farthest_index, last))
 
         return nbr_vertice_deleted
-
-    def _find_farthest_point(self, qgs_points, first, last, ):
-        """
-        Returns a tuple with the farthest point's index and it's distance of a line's section
-
-        Parameters:
-            - line: The line to process
-            - first: Index of the first point the line's section to test
-            - last: Index of the last point the line's section to test
-
-        """
-
-        if last-first >= 2:
-#            qgs_pnt_first = qgs_geom_line.vertexAt(first)
-#            qgs_pnt_last = qgs_geom_line.vertexAt(last)
-            qgs_geom_first_last = QgsLineString(qgs_points[first], qgs_points[last])
-            qgs_geom_engine = QgsGeometry.createGeometryEngine(qgs_geom_first_last)
-            distances = [qgs_geom_engine.distance(qgs_points[i]) for i in range(first+1, last)]
-            farthest_dist = max(distances)
-            farthest_index = distances.index(farthest_dist) + first + 1
-        else:
-            # Not enough vertice to calculate the farthest distance
-            farthest_dist = 0
-            farthest_index = first
-
-        return farthest_index, farthest_dist

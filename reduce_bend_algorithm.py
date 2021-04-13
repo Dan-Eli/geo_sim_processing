@@ -38,7 +38,7 @@ from qgis.core import (QgsProcessing, QgsProcessingAlgorithm, QgsProcessingParam
                        QgsPointXY, QgsLineString, QgsPolygon, QgsWkbTypes, QgsGeometry,
                        QgsGeometryUtils, QgsRectangle, QgsProcessingException, QgsMultiPolygon)
 import processing
-from .geo_sim_util import Epsilon, GsCollection, GsFeature, GsPolygon, GsLineString, GsPoint, Bend
+from .geo_sim_util import Epsilon, GsCollection, GsFeature, GsPolygon, GsLineString, GsPoint, Bend, GeoSimUtil
 
 
 class ReduceBendAlgorithm(QgsProcessingAlgorithm):
@@ -148,12 +148,6 @@ class ReduceBendAlgorithm(QgsProcessingAlgorithm):
                           self.tr('Exclude hole'),
                           defaultValue=True))
 
-        # 'VERBOSE' mode for more output information
-        self.addParameter(QgsProcessingParameterBoolean(
-            'VERBOSE',
-            self.tr('Verbose'),
-            defaultValue=False))
-
         # 'OUTPUT' for the results
         self.addParameter(QgsProcessingParameterFeatureSink(
                           'OUTPUT',
@@ -172,7 +166,6 @@ class ReduceBendAlgorithm(QgsProcessingAlgorithm):
         exclude_hole = self.parameterAsBool(parameters, "EXCLUDE_HOLE", context)
         exclude_polygon = self.parameterAsBool(parameters, "EXCLUDE_POLYGON", context)
         validate_structure = self.parameterAsBool(parameters, "VALIDATE_STRUCTURE", context)
-        verbose = self.parameterAsBool(parameters, "VERBOSE", context)
 
         if source_in is None:
             raise QgsProcessingException(self.invalidSourceError(parameters, "INPUT"))
@@ -207,11 +200,12 @@ class ReduceBendAlgorithm(QgsProcessingAlgorithm):
             sink.addFeature(qgs_feature_out, QgsFeatureSink.FastInsert)
 
         # Push some output statistics
+        feedback.pushInfo(" ")
         feedback.pushInfo("Number of features in: {0}".format(rb_return.in_nbr_features))
         feedback.pushInfo("Number of features out: {0}".format(rb_return.out_nbr_features))
         feedback.pushInfo("Number of iteration needed: {0}".format(rb_return.nbr_pass))
-        feedback.pushInfo("Number of bends detected: {0}".format(rb_return.nbr_bend_detected[0]))
-        feedback.pushInfo("Number of bends reduced: {0}".format(sum(rb_return.nbr_bend_reduced)))
+        feedback.pushInfo("Number of bends detected: {0}".format(rb_return.nbr_bend_detected))
+        feedback.pushInfo("Number of bends reduced: {0}".format(rb_return.nbr_bend_reduced))
         feedback.pushInfo("Number of deleted polygons: {0}".format(rb_return.nbr_pol_del))
         feedback.pushInfo("Number of deleted polygon holes: {0}".format(rb_return.nbr_hole_del))
         feedback.pushInfo("Number of line smoothed: {0}".format(rb_return.nbr_line_smooth))
@@ -221,11 +215,6 @@ class ReduceBendAlgorithm(QgsProcessingAlgorithm):
             else:
                 status = "Invalid"
             feedback.pushInfo("Debug - State of the internal data structure: {0}".format(status))
-        if verbose:
-            for i in range(rb_return.nbr_pass):
-                str_value = "Iteration: {}; Bends detected: {}; Bend reduced: {}" \
-                            .format(i, rb_return.nbr_bend_detected[i], rb_return.nbr_bend_reduced[i])
-                feedback.pushInfo("Verbose - {0}".format(str_value))
 
         return {"OUTPUT": dest_id}
 
@@ -481,8 +470,8 @@ class RbResults:
 
         self.in_nbr_features = None
         self.out_nbr_features = None
-        self.nbr_bend_reduced = []  # One value per iteration
-        self.nbr_bend_detected = []  # One value per iteration
+        self.nbr_bend_reduced = 0
+        self.nbr_bend_detected = 0
         self.qgs_features_out = None
         self.nbr_hole_del = 0
         self.nbr_pol_del = 0
@@ -770,74 +759,6 @@ class ReduceBend:
         return len(rb_geom.bends)
 
     @staticmethod
-    def validate_simplicity(qgs_geoms_with_itself, qgs_geom_new_subline):
-        """Validate the simplicitity constraint
-
-        This constraint assure that the new sub line is not intersecting with any other segment of the same line
-
-        :param: qgs_geoms_with_itself: List of QgsLineString segment to verify for self intersection
-        :param: qgs_geom_new_subline: New QgsLineString replacement sub line.
-        :return: Flag indicating if the spatial constraint is valid
-        :rtype: Bool
-        """
-
-        constraints_valid = True
-        geom_engine_subline = QgsGeometry.createGeometryEngine(qgs_geom_new_subline.constGet().clone())
-        for qgs_geom_potential in qgs_geoms_with_itself:
-            de_9im_pattern = geom_engine_subline.relate(qgs_geom_potential.constGet().clone())
-            # de_9im_pattern[0] == '0' means that their interiors intersect (crosses)
-            # de_9im_pattern[1] == '0' means that one extremity is touching the interior of the other (touches)
-            if de_9im_pattern[0] == '0' or de_9im_pattern[1] == '0':
-                # The new sub line intersect or touch with itself. The result would create a non OGC simple line
-                constraints_valid = False
-                break
-
-        return constraints_valid
-
-    @staticmethod
-    def validate_intersection(qgs_geom_with_others, qgs_geom_new_subline):
-        """Validate the intersection constraint
-
-        This constraint assure that the new sub line is not intersecting with any other lines (not itself)
-
-        :param: qgs_geoms_with_others: List of QgsLineString segment to verify for intersection
-        :param: qgs_geom_new_subline: New QgsLineString replacement sub line.
-        :return: Flag indicating if the spatial constraint is valid
-        :rtype: Bool
-        """
-
-        constraints_valid = True
-        for qgs_geom_potential in qgs_geom_with_others:
-            if not qgs_geom_potential.disjoint(qgs_geom_new_subline):
-                # The bend area intersects with a point
-                constraints_valid = False
-                break
-
-        return constraints_valid
-
-    @staticmethod
-    def validate_sidedness(qgs_geom_with_others, qgs_geom_bend):
-        """Validate the sidedness constraint
-
-        This constraint assure that the new sub line will not change the relative position of an object compared to
-        the polygon formed by the bend to reduce. ex.: an interior ring of a polygon going outside of the exterior ring.
-
-        :param: qgs_geoms_with_others: List of QgsLineString segment to verify for intersection
-        :param: qgs_geom_bend: QgsPolygon formed by the bend to reduce
-        :return: Flag indicating if the spatial constraint is valid
-        :rtype: Bool
-        """
-
-        constraints_valid = True
-        for qgs_geom_potential in qgs_geom_with_others:
-            if qgs_geom_bend.contains(qgs_geom_potential):
-                # A feature is totally located inside
-                constraints_valid = False
-                break
-
-        return constraints_valid
-
-    @staticmethod
     def find_alternate_bends(ind, rb_geom):
         """This method fins alternate possible bend
 
@@ -908,13 +829,13 @@ class ReduceBend:
         :rtype: RbResult
         """
 
-        """
+
         #  Code used for the profiler (uncomment if needed)
         import cProfile, pstats, io
         from pstats import SortKey
         pr = cProfile.Profile()
         pr.enable()
-        """
+
 
         # Calculates the epsilon and initialize some stats and results value
         self.eps = Epsilon(self.qgs_in_features)
@@ -951,14 +872,14 @@ class ReduceBend:
             self.rb_collection.validate_integrity(self.rb_geoms)
 
         #  Code used for the profiler (uncomment if needed)
-        """
+
         pr.disable()
         s = io.StringIO()
         sortby = SortKey.CUMULATIVE
         ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
         ps.print_stats()
         print(s.getvalue())
-        """
+
 
         return self.rb_results
 
@@ -1046,46 +967,41 @@ class ReduceBend:
 
         """
 
-        min_nbr_pass = 2
-        nbr_geoms = 100.0 / len(self.rb_geoms) if len(self.rb_geoms) >= 1 else 0
+        min_nbr_pass = 3
         while True:
-            self.feedback.setProgress(max(1, int(self.count_rb_geoms_done() * nbr_geoms)))
+            progress_bar_value = 0
+            self.rb_results.nbr_pass += 1
+            self.feedback.pushInfo("Iteration: {0}".format(self.rb_results.nbr_pass))
+            self.feedback.setProgress(progress_bar_value)
             nbr_bend_reduced = 0
             nbr_bend_detected = 0
-            for rb_geom in self.rb_geoms:
+            for i, rb_geom in enumerate(self.rb_geoms):
                 if self.feedback.isCanceled():
                     break
                 if not rb_geom.is_simplest:  # Only process geometry that are not at simplest form
                     self.delete_co_linear(rb_geom)
-                    nbr_bend_detected = ReduceBend.detect_bends(rb_geom)
+                    tmp_nbr_bend_detected = ReduceBend.detect_bends(rb_geom)
                     if rb_geom.need_pivot:
                         #  Pivoting a closed line moves the first/last vertice on a bend that do not need simplification
                         ReduceBend.pivot_closed_line(rb_geom, self.diameter_tol)
-                        nbr_bend_detected = ReduceBend.detect_bends(rb_geom)  # Bend detection needed after pivot
+                        tmp_nbr_bend_detected = ReduceBend.detect_bends(rb_geom)  # Bend detection needed after pivot
+                    nbr_bend_detected += tmp_nbr_bend_detected
                     ReduceBend.flag_bend_to_reduce(rb_geom, self.diameter_tol)
                     nbr_bend_reduced += self.process_bends(rb_geom)
+                    new_progress_bar_value = int(i / len(self.rb_geoms) * 100)
+                    if new_progress_bar_value > progress_bar_value:
+                        progress_bar_value = new_progress_bar_value
+                        self.feedback.setProgress(progress_bar_value)
 
-            self.rb_results.nbr_bend_reduced.append(nbr_bend_reduced)
-            self.rb_results.nbr_bend_detected.append(nbr_bend_detected)
+            self.rb_results.nbr_bend_reduced += nbr_bend_reduced
+            self.rb_results.nbr_bend_detected += nbr_bend_detected
 
-            # While loop breaking condition
+            # Breaking condition for the while loop
+            self.feedback.pushInfo("Bend detected: {}; Bend reduced: {}".format(nbr_bend_detected, nbr_bend_reduced))
             if self.rb_results.nbr_pass > min_nbr_pass and nbr_bend_reduced == 0:
                 break
-            self.rb_results.nbr_pass += 1
 
         return
-
-    def count_rb_geoms_done(self):
-        """Count the number of geometry  that are at there simplest form
-
-        """
-
-        nbr_done = 0
-        for rb_geom in self.rb_geoms:
-            if rb_geom.is_simplest:
-                nbr_done += 1
-
-        return nbr_done
 
     def delete_co_linear(self, rb_geom):
         """Delete co-linear vertice on a LineString
@@ -1199,7 +1115,7 @@ class ReduceBend:
         # First: check if the bend reduce line string is an OGC simple line
         # We test with a tiny smaller line to ease the testing and false positive error
         if bend.qgs_geom_new_subline.length() >= Epsilon.ZERO_RELATIVE:
-            constraints_valid = ReduceBend.validate_simplicity(qgs_geoms_with_itself, bend.qgs_geom_new_subline)
+            constraints_valid = GeoSimUtil.validate_simplicity(qgs_geoms_with_itself, bend.qgs_geom_new_subline)
             if not constraints_valid:
                 # The bend reduction caused self intersection; try to find an alternate bend
                 alternate_bends = ReduceBend.find_alternate_bends(ind, rb_geom)
@@ -1214,12 +1130,12 @@ class ReduceBend:
 
         # Second: check that the new line does not intersect any other line or points
         if constraints_valid:
-            constraints_valid = ReduceBend.validate_intersection(qgs_geoms_with_others, bend.qgs_geom_new_subline)
+            constraints_valid = GeoSimUtil.validate_intersection(qgs_geoms_with_others, bend.qgs_geom_new_subline)
 
         # Third: check that inside the bend to reduce there is no feature completely inside it.  This would cause a
         # sidedness or relative position error
         if constraints_valid:
-            constraints_valid = ReduceBend.validate_sidedness(qgs_geoms_with_others, bend.qgs_geom_bend)
+            constraints_valid = GeoSimUtil.validate_sidedness(qgs_geoms_with_others, bend.qgs_geom_bend)
 
         return constraints_valid
 
@@ -1251,18 +1167,18 @@ class ReduceBend:
 
         # First: check if the bend reduce line string is an OGC simple line
         # We test with a tiny smaller line to ease the testing and false positive error
-        constraints_valid = ReduceBend.validate_simplicity(qgs_geoms_with_itself,
+        constraints_valid = GeoSimUtil.validate_simplicity(qgs_geoms_with_itself,
                                                            reduced_bend.qgs_geom_smooth_line)
 
         # Second: check that the new line does not intersect any other line or points
         if constraints_valid:
-            constraints_valid = ReduceBend.validate_intersection(qgs_geoms_with_others,
+            constraints_valid = GeoSimUtil.validate_intersection(qgs_geoms_with_others,
                                                                  reduced_bend.qgs_geom_smooth_line)
 
         # Third: check that inside the bend to reduce there is no feature completely inside it.  This would cause a
         # sidedness or relative position error
         if constraints_valid:
-            constraints_valid = ReduceBend.validate_sidedness(qgs_geoms_with_others,
+            constraints_valid = GeoSimUtil.validate_sidedness(qgs_geoms_with_others,
                                                               reduced_bend.qgs_geom_smooth_polygon)
 
         return constraints_valid

@@ -705,3 +705,99 @@ class Bend:
         if self._qgs_geom_old_subline is None:
             self._qgs_geom_old_subline = QgsGeometry(QgsLineString(self._qgs_points))
         return self._qgs_geom_old_subline
+
+
+class GeoSimUtil:
+    """Class containing a list general static method"""
+
+    @staticmethod
+    def validate_simplicity(qgs_geoms_with_itself, qgs_geom_new_subline):
+        """Validate the simplicitity constraint
+
+        This constraint assure that the new sub line is not intersecting with any other segment of the same line
+
+        :param: qgs_geoms_with_itself: List of QgsLineString segment to verify for self intersection
+        :param: qgs_geom_new_subline: New QgsLineString replacement sub line.
+        :return: Flag indicating if the spatial constraint is valid
+        :rtype: Bool
+        """
+
+        constraints_valid = True
+        geom_engine_subline = QgsGeometry.createGeometryEngine(qgs_geom_new_subline.constGet().clone())
+        for qgs_geom_potential in qgs_geoms_with_itself:
+            de_9im_pattern = geom_engine_subline.relate(qgs_geom_potential.constGet().clone())
+            # de_9im_pattern[0] == '0' means that their interiors intersect (crosses)
+            # de_9im_pattern[1] == '0' means that one extremity is touching the interior of the other (touches)
+            if de_9im_pattern[0] == '0' or de_9im_pattern[1] == '0':
+                # The new sub line intersect or touch with itself. The result would create a non OGC simple line
+                constraints_valid = False
+                break
+
+        return constraints_valid
+
+    @staticmethod
+    def validate_intersection(qgs_geom_with_others, qgs_geom_new_subline):
+        """Validate the intersection constraint
+
+        This constraint assure that the new sub line is not intersecting with any other lines (not itself)
+
+        :param: qgs_geoms_with_others: List of QgsLineString segment to verify for intersection
+        :param: qgs_geom_new_subline: New QgsLineString replacement sub line.
+        :return: Flag indicating if the spatial constraint is valid
+        :rtype: Bool
+        """
+
+        constraints_valid = True
+        for qgs_geom_potential in qgs_geom_with_others:
+            if not qgs_geom_potential.disjoint(qgs_geom_new_subline):
+                # The bend area intersects with a point
+                constraints_valid = False
+                break
+
+        return constraints_valid
+
+    @staticmethod
+    def validate_sidedness(qgs_geom_with_others, qgs_geom_bend):
+        """Validate the sidedness constraint
+
+        This constraint assure that the new sub line will not change the relative position of an object compared to
+        the polygon formed by the bend to reduce. ex.: an interior ring of a polygon going outside of the exterior ring.
+
+        :param: qgs_geoms_with_others: List of QgsLineString segment to verify for intersection
+        :param: qgs_geom_bend: QgsPolygon formed by the bend to reduce
+        :return: Flag indicating if the spatial constraint is valid
+        :rtype: Bool
+        """
+
+        constraints_valid = True
+        for qgs_geom_potential in qgs_geom_with_others:
+            if qgs_geom_bend.contains(qgs_geom_potential):
+                # A feature is totally located inside
+                constraints_valid = False
+                break
+
+        return constraints_valid
+
+    @staticmethod
+    def create_gs_feature(qgs_in_features):
+        """Create the different GsFeatures from the QgsFeatures.
+
+        :return: List of rb_features
+        :rtype: [GsFeature]
+        """
+
+        gs_features = []
+
+        for qgs_feature in qgs_in_features:
+            qgs_geom = qgs_feature.geometry()  # extract the Geometry
+
+            if GsFeature.is_polygon(qgs_geom.wkbType()):
+                gs_features.append(GsPolygon(qgs_feature))
+            elif GsFeature.is_line_string(qgs_geom.wkbType()):
+                gs_features.append(GsLineString(qgs_feature))
+            elif GsFeature.is_point(qgs_geom.wkbType()):
+                gs_features.append(GsPoint(qgs_feature))
+            else:
+                raise QgsProcessingException("Internal geometry error")
+
+        return gs_features

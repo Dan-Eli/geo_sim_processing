@@ -178,7 +178,7 @@ class Test(unittest.TestCase):
 
 
     def test_case08(self):
-        title = "Test 08: 1 point and 3 line string to validate bounding box sub dividing"
+        title = "Test 08: 1 line string with one bend to simplify"
         qgs_geom0 = create_line([(0, 0), (1, 1), (2,0)])
         qgs_feature_out = build_and_launch(title,[qgs_geom0], 3)
         out_qgs_geom0 = create_line([(0, 0), (2, 0)])
@@ -186,7 +186,7 @@ class Test(unittest.TestCase):
         self.assertTrue (val0, title)
 
     def test_case09(self):
-        title = "Test 09: 1 point and 3 line string to validate bounding box sub dividing"
+        title = "Test 09: 1 point and 3 line string no simplification"
         qgs_geom0 = create_point((0,0))
         qgs_geom1 = create_line([(0, 0), (100, 0)])
         qgs_geom2 = create_line([(0, 0), (0, 100)])
