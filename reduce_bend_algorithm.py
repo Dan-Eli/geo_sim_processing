@@ -170,6 +170,10 @@ class ReduceBendAlgorithm(QgsProcessingAlgorithm):
         if source_in is None:
             raise QgsProcessingException(self.invalidSourceError(parameters, "INPUT"))
 
+        from guppy import hpy
+        h = hpy()
+        print(h.heap())
+
         # Transform the in source into a vector layer
         vector_layer_in = source_in.materialize(QgsFeatureRequest(), feedback)
 
@@ -198,6 +202,7 @@ class ReduceBendAlgorithm(QgsProcessingAlgorithm):
 
         for qgs_feature_out in rb_return.qgs_features_out:
             sink.addFeature(qgs_feature_out, QgsFeatureSink.FastInsert)
+            qgs_feature_out = None
 
         # Push some output statistics
         feedback.pushInfo(" ")
@@ -215,6 +220,14 @@ class ReduceBendAlgorithm(QgsProcessingAlgorithm):
             else:
                 status = "Invalid"
             feedback.pushInfo("Debug - State of the internal data structure: {0}".format(status))
+
+        # Free some memory
+        del qgs_features_in
+        del rb_return
+
+        from guppy import hpy
+        h = hpy()
+        print(h.heap())
 
         return {"OUTPUT": dest_id}
 
@@ -726,7 +739,7 @@ class ReduceBend:
         angles = ReduceBend.get_angles(rb_geom.qgs_geom.constGet())
         # Modify the angle to binary orientation: clockwise or anti clockwise
         orientation = [CLOCK_WISE if angle >= math.pi else ANTI_CLOCK_WISE for angle in angles]
-        if rb_geom.qgs_geom.constGet().isClosed():
+        if rb_geom.qgs_geom.constGet().isClosed() and len(orientation) >= 1:
             if len(set(orientation)) == 1:
                 orientation = []  # All the angles have the same orientation.  No bend to reduce
             else:
@@ -753,8 +766,8 @@ class ReduceBend:
                 rb_geom.bends.append(Bend(i, j, qgs_points[i:j+1]))
 
         else:
-            # If there is no inflexion the line cannot be simplified
-            rb_geom.is_simplest = True
+            rb_geom.is_simplest = True  # The line has no inflexion; it cannot be simplified
+
 
         return len(rb_geom.bends)
 
@@ -831,10 +844,10 @@ class ReduceBend:
 
 
         #  Code used for the profiler (uncomment if needed)
-        import cProfile, pstats, io
-        from pstats import SortKey
-        pr = cProfile.Profile()
-        pr.enable()
+#        import cProfile, pstats, io
+#        from pstats import SortKey
+#        pr = cProfile.Profile()
+#        pr.enable()
 
 
         # Calculates the epsilon and initialize some stats and results value
@@ -843,8 +856,12 @@ class ReduceBend:
         self.rb_results = RbResults()
 
         # Create the list of GsPolygon, GsLineString and GsPoint to process
-        self.rb_features = self.create_rb_feature()
+        self.rb_features = GsFeature.create_gs_feature(self.qgs_in_features)
         self.rb_results.in_nbr_features = len(self.qgs_in_features)
+
+        for qgs_in_feature in self.qgs_in_features:
+            qgs_in_feature = None
+        del self.qgs_in_features
 
         # Pre process the LineString: remove to close point and co-linear points
         self.rb_geoms = self.pre_reduction_process()
@@ -871,40 +888,42 @@ class ReduceBend:
         if self.rb_results.is_structure_valid:
             self.rb_collection.validate_integrity(self.rb_geoms)
 
-        #  Code used for the profiler (uncomment if needed)
+#        from guppy import hpy
+#        h = hpy()
+#        print(h.heap())
+        # Free some memory
+#        for rb_geom in self.rb_geoms:
+#            rb_geom.delete()
+#        del self.rb_geoms
 
-        pr.disable()
-        s = io.StringIO()
-        sortby = SortKey.CUMULATIVE
-        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-        ps.print_stats()
-        print(s.getvalue())
+#        for rb_feature in self.rb_features:
+#            rb_feature.delete()
+#        del self.rb_features
+
+#        import sip
+#        sip.delete(self.rb_collection._spatial_index)
+#        for key in self.rb_collection._dict_qgs_segment:
+#            value = self.rb_collection._dict_qgs_segment[key]
+#            self.rb_collection._dict_qgs_segment[key] = None
+#        del self.rb_collection._dict_qgs_segment
+#        del self.rb_collection._spatial_index
+
+#        from guppy import hpy
+#        h = hpy()
+#        print(h.heap())
+
+
+
+        #  Code used for the profiler (uncomment if needed)
+ #       pr.disable()
+ #       s = io.StringIO()
+ #       sortby = SortKey.CUMULATIVE
+ #       ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+ #       ps.print_stats()
+ #       print(s.getvalue())
 
 
         return self.rb_results
-
-    def create_rb_feature(self):
-        """Create the different GsFeatures from the QgsFeatures.
-
-        :return: List of rb_features
-        :rtype: [GsFeature]
-        """
-
-        rb_features = []
-
-        for qgs_feature in self.qgs_in_features:
-            qgs_geom = qgs_feature.geometry()  # extract the Geometry
-
-            if GsFeature.is_polygon(qgs_geom.wkbType()):
-                rb_features.append(GsPolygon(qgs_feature))
-            elif GsFeature.is_line_string(qgs_geom.wkbType()):
-                rb_features.append(GsLineString(qgs_feature))
-            elif GsFeature.is_point(qgs_geom.wkbType()):
-                rb_features.append(GsPoint(qgs_feature))
-            else:
-                raise QgsProcessingException("Internal geometry error")
-
-        return rb_features
 
     def pre_reduction_process(self):
         """This method execute the pre reduction process
@@ -1026,7 +1045,7 @@ class ReduceBend:
         for vertex_id_to_del in reversed(vertex_ids_to_del):
             self.rb_collection.delete_vertex(rb_geom, vertex_id_to_del, vertex_id_to_del)
 
-        # Special case to process closed line string to find ans delete co-linear points at the first/last vertice
+        # Special case to process closed line string to find and delete co-linear points at the first/last vertice
         if rb_geom.qgs_geom.constGet().isClosed():
             num_points = rb_geom.qgs_geom.constGet().numPoints()
             if num_points >= 5:  # Minimum of 5 vertices are needed to have co-linear vertices in closed line
@@ -1205,6 +1224,7 @@ class ReduceBend:
                         self.bends_reduced.append(BendReduced(rb_geom, qgs_pnt_i, qgs_pnt_j, bend.qgs_geom_bend))
                     self.rb_collection.delete_vertex(rb_geom, bend.i+1, bend.j-1)
                     nbr_bend_reduced += 1
+        rb_geom.bends = []  # Free memory
 
         return nbr_bend_reduced
 

@@ -94,14 +94,14 @@ class GsCollection:
     QgsSpatialIndex class is used to store and retrieve the features.
     """
 
-    __slots__ = ('_spatial_index', '_dict_qgs_rb_geom', '_dict_qgs_segment', '_id_qgs_segment')
+    __slots__ = ('_spatial_index', '_dict_qgs_segment', '_id_qgs_segment')
 
     def __init__(self):
         """Constructor that initialize the GsCollection.
 
         """
 
-        self._spatial_index = QgsSpatialIndex(flags=QgsSpatialIndex.FlagStoreFeatureGeometries)
+        self._spatial_index = QgsSpatialIndex()
         self._dict_qgs_segment = {}  # Contains a reference to the original geometry
         self._id_qgs_segment = 0
 
@@ -116,43 +116,41 @@ class GsCollection:
 
         return self._id_qgs_segment
 
-    def _create_feature_segment(self, origin_id, qgs_geom):
-        """Creates a new QgsFeature to load in the QgsSpatialIndex.
+    def _create_rectangle(self, id, qgs_geom):
+        """Creates a new QgsRectangle to load in the QgsSpatialIndex.
 
-        :param int origin_id: ID of the source feature (for reference purpose)
+        :param id: Integer ID of the geometry
+        :param: qgs_geom: QgsGeometry to use for bounding box extraction
         :return: The feature created
         :rtype: QgsFeature
         """
 
         id_segment = self._get_next_id_segment()
-        self._dict_qgs_segment[id_segment] = origin_id  # Creates a reference for to the original RbGeom
-        qgs_feature = QgsFeature(id=id_segment)
-        qgs_feature.setGeometry(qgs_geom)
+        self._dict_qgs_segment[id_segment] = (id, qgs_geom)  # Reference to the RbGeom ID and geometry
 
-        return qgs_feature
+        return id_segment, qgs_geom.boundingBox()
 
     def add_features(self, rb_geoms):
         """Add a RbGeom object in the spatial index.
 
         For the LineString geometries. The geometry is broken into each line segment that are individually
-        loaded in the QgsSpatialIndex.  This strategy takes longer to load than if the feature was loaded as a whole
-        but is better for much of the cases.
+        loaded in the QgsSpatialIndex.  This strategy accelerate the validation of the spatial constraints.
 
-        :param [RbGeom] rb_geoms: List of RbGeom to load
+        :param [RbGeom] rb_geoms: List of RbGeom to load in the QgsSpatialIndex
         """
 
         for rb_geom in rb_geoms:
-            qgs_features = []
+            qgs_rectangles = []
             if rb_geom.qgs_geom.wkbType() == QgsWkbTypes.Point:
-                qgs_features.append(self._create_feature_segment(rb_geom.id, rb_geom.qgs_geom))
+                qgs_rectangles.append(self._create_rectangle(rb_geom.id, rb_geom.qgs_geom))
             else:
                 qgs_points = rb_geom.qgs_geom.constGet().points()
                 for i in range(0, (len(qgs_points)-1)):
                     qgs_geom = QgsGeometry(QgsLineString(qgs_points[i], qgs_points[i+1]))
-                    qgs_feature = self._create_feature_segment(rb_geom.id, qgs_geom)
-                    qgs_features.append(qgs_feature)
+                    qgs_rectangles.append(self._create_rectangle(rb_geom.id, qgs_geom))
 
-            self._spatial_index.addFeatures(qgs_features)  # Load all the segment of one RbGeom at the same time
+            for id, qgs_rectangle in qgs_rectangles:
+                self._spatial_index.addFeature(id, qgs_rectangle)
 
         return
 
@@ -172,21 +170,23 @@ class GsCollection:
         qgs_geoms_with_itself = []
         qgs_geoms_with_others = []
         qgs_rectangle.grow(Epsilon.ZERO_RELATIVE*100.)  # Always increase the b_box to avoid degenerated b_box
-        qgs_segment_ids = self._spatial_index.intersects(qgs_rectangle)
-        for qgs_segment_id in qgs_segment_ids:
-            qgs_geom_segment = self._spatial_index.geometry(qgs_segment_id)
-            if qgs_geom_segment.wkbType() == QgsWkbTypes.Point:
-                qgs_geoms_with_others.append(qgs_geom_segment)
+        ids = self._spatial_index.intersects(qgs_rectangle)
+        for id in ids:
+            target_qgs_geom_id, target_qgs_geom = self._dict_qgs_segment[id]
+            if target_qgs_geom_id is None:
+                # Nothing to do; segment was deleted
+                pass
             else:
-                if self._dict_qgs_segment[qgs_segment_id] == qgs_geom_id:
-                    if not qgs_geom_segment.within(qgs_geom_subline):
-                        qgs_geoms_with_itself.append(qgs_geom_segment)
+                if target_qgs_geom_id == qgs_geom_id:
+                    # Test that the segment is not part of qgs_subline
+                    if not target_qgs_geom.within(qgs_geom_subline):
+                        qgs_geoms_with_itself.append(target_qgs_geom)
                 else:
-                    qgs_geoms_with_others.append(qgs_geom_segment)
+                    qgs_geoms_with_others.append(target_qgs_geom)
 
         return qgs_geoms_with_itself, qgs_geoms_with_others
 
-    def _delete_segment(self, qgs_pnt0, qgs_pnt1):
+    def _delete_segment(self, qgs_geom_id, qgs_pnt0, qgs_pnt1):
         """Delete a line segment in the spatial index based on start/end points.
 
         To minimise the number of feature returned we search for a very small bounding box located in the middle
@@ -196,25 +196,20 @@ class GsCollection:
         :param qgs_pnt1 : QgsPoint end point of the target line segment.
         """
 
-        qgs_geom_target = QgsGeometry(QgsLineString(qgs_pnt0, qgs_pnt1))
+        qgs_geom_to_delete = QgsGeometry(QgsLineString(qgs_pnt0, qgs_pnt1))
         qgs_mid_point = QgsGeometryUtils.midpoint(qgs_pnt0, qgs_pnt1)
         qgs_rectangle = qgs_mid_point.boundingBox()
         qgs_rectangle.grow(Epsilon.ZERO_RELATIVE*100)
-        feat_ids = self._spatial_index.intersects(qgs_rectangle)
-        deleted = True
-        for feat_id in feat_ids:
-            qgs_geom_line = self._spatial_index.geometry(feat_id)  # Extract geometry
-            #  Check if it's the target geometry
-            if qgs_geom_target.hausdorffDistance(qgs_geom_line) <= Epsilon.ZERO_RELATIVE:
-                feature = QgsFeature(id=feat_id)
-                feature.setGeometry(qgs_geom_target)
-                if self._spatial_index.deleteFeature(feature):  # Delete the line segment
+        deleted = False
+        ids = self._spatial_index.intersects(qgs_rectangle)
+        for id in ids:
+            target_qgs_geom_id, target_qgs_geom = self._dict_qgs_segment[id]  # Extract id and geometry
+            if qgs_geom_id == target_qgs_geom_id:
+                # Only check for the same ID
+                if target_qgs_geom.equals(qgs_geom_to_delete):  #  Check if it's the same geometry
                     deleted = True
+                    self._dict_qgs_segment[id] = (None, None)  # Delete from the internal structure
                     break
-                else:
-                    raise Exception(QgsProcessingException("Unable to delete entry in QgsSpatialIndex..."))
-            else:
-                deleted = False
 
         if not deleted:
             raise Exception(QgsProcessingException("Internal structure corruption..."))
@@ -234,7 +229,7 @@ class GsCollection:
 
         is_closed = rb_geom.qgs_geom.constGet().isClosed()
         v_ids_to_del = list(range(v_id_start, v_id_end+1))
-        if is_closed and v_id_start == 0:
+        if v_id_start == 0 and is_closed:
             # Special case for closed line where we simulate a circular array
             nbr_vertice = rb_geom.qgs_geom.constGet().numPoints()
             v_ids_to_del.insert(0, nbr_vertice - 2)
@@ -246,19 +241,19 @@ class GsCollection:
         for i in range(len(v_ids_to_del)-1):
             qgs_pnt0 = rb_geom.qgs_geom.vertexAt(v_ids_to_del[i])
             qgs_pnt1 = rb_geom.qgs_geom.vertexAt(v_ids_to_del[i+1])
-            self._delete_segment(qgs_pnt0, qgs_pnt1)
+            self._delete_segment(rb_geom.id, qgs_pnt0, qgs_pnt1)
 
         # Add the new line segment in the spatial index
         qgs_pnt0 = rb_geom.qgs_geom.vertexAt(v_ids_to_del[0])
         qgs_pnt1 = rb_geom.qgs_geom.vertexAt(v_ids_to_del[-1])
         qgs_geom_segment = QgsGeometry(QgsLineString(qgs_pnt0, qgs_pnt1))
-        qgs_feature = self._create_feature_segment(rb_geom.id, qgs_geom_segment)
-        self._spatial_index.addFeature(qgs_feature)
+        id, qgs_rectangle = self._create_rectangle(rb_geom.id, qgs_geom_segment)
+        self._spatial_index.addFeature(id, qgs_rectangle)
 
         # Delete the vertex in the line string geometry
         for v_id_to_del in reversed(range(v_id_start, v_id_end+1)):
             rb_geom.qgs_geom.deleteVertex(v_id_to_del)
-            if is_closed and v_id_start == 0:
+            if v_id_start == 0 and is_closed:
                 # Special case for closed line where we simulate a circular array
                 nbr_vertice = rb_geom.qgs_geom.constGet().numPoints()
                 qgs_pnt_first = rb_geom.qgs_geom.vertexAt(0)
@@ -280,7 +275,7 @@ class GsCollection:
         # Delete the base of the bend
         qgs_pnt0 = rb_geom.qgs_geom.vertexAt(bend_i)
         qgs_pnt1 = rb_geom.qgs_geom.vertexAt(bend_j)
-        self._delete_segment(qgs_pnt0, qgs_pnt1)
+        self._delete_segment(rb_geom.id, qgs_pnt0, qgs_pnt1)
 
         qgs_points = qgs_geom_new_subline.constGet().points()
         tmp_qgs_points = qgs_points[1:-1]  # Drop first/last item
@@ -293,8 +288,8 @@ class GsCollection:
             qgs_pnt_a = qgs_points[i]
             qgs_pnt_b = qgs_points[i+1]
             qgs_geom_segment = QgsGeometry(QgsLineString(qgs_pnt_a, qgs_pnt_b))
-            qgs_feature = self._create_feature_segment(rb_geom.id, qgs_geom_segment)
-            self._spatial_index.addFeature(qgs_feature)
+            id, qgs_rectangle = self._create_rectangle(rb_geom.id, qgs_geom_segment)
+            self._spatial_index.addFeature(id, qgs_rectangle)
 
         return
 
@@ -384,6 +379,31 @@ class GsFeature(ABC):
 
         return val
 
+    @staticmethod
+    def create_gs_feature(qgs_in_features):
+        """Create the different GsFeatures from the QgsFeatures.
+
+        :param: qgs_in_features: List of QgsFeature to process
+        :return: List of rb_features
+        :rtype: [GsFeature]
+        """
+
+        rb_features = []
+
+        for qgs_feature in qgs_in_features:
+            qgs_geom = qgs_feature.geometry()  # extract the Geometry
+
+            if GsFeature.is_polygon(qgs_geom.wkbType()):
+                rb_features.append(GsPolygon(qgs_feature))
+            elif GsFeature.is_line_string(qgs_geom.wkbType()):
+                rb_features.append(GsLineString(qgs_feature))
+            elif GsFeature.is_point(qgs_geom.wkbType()):
+                rb_features.append(GsPoint(qgs_feature))
+            else:
+                raise QgsProcessingException("Internal geometry error")
+
+        return rb_features
+
     def __init__(self, qgs_feature):
         """Constructor of the GsFeature class.
 
@@ -450,6 +470,12 @@ class GsPolygon(GsFeature):
 
         return self.qgs_feature
 
+    def delete(self):
+
+        del self.qgs_feature
+        del self.id
+        del self.qgs_geom
+
 
 class GsLineString(GsFeature):
     """Class managing a GsLineString.
@@ -484,7 +510,15 @@ class GsLineString(GsFeature):
 
         qgs_geom = QgsGeometry(self.rb_geom[0].qgs_geom.constGet().clone())
         self.qgs_feature.setGeometry(qgs_geom)
+
         return self.qgs_feature
+
+    def delete(self):
+
+        del self.qgs_feature
+        del self.id
+        del self.qgs_geom
+        del self.rb_geom
 
 
 class GsPoint(GsFeature):
@@ -524,7 +558,15 @@ class GsPoint(GsFeature):
 
         qgs_geom = QgsGeometry(self.rb_geom[0].qgs_geom.constGet().clone())
         self.qgs_feature.setGeometry(qgs_geom)
+
         return self.qgs_feature
+
+    def delete(self):
+
+        del self.qgs_feature
+        del self.id
+        del self.qgs_geom
+        del self.rb_geom
 
 
 class RbGeom:
@@ -562,24 +604,27 @@ class RbGeom:
         self.is_simplest = False
         self.need_pivot = False
         self.bends = []
-        # Set some variable depending on the attribute of the feature
+        # Set some variable depending on the geometry of the feature
         if self.original_geom_type == QgsWkbTypes.Point:
             self.is_simplest = True  # A point cannot be simplified
-        elif self.original_geom_type == QgsWkbTypes.LineString:
+        else:
+            # Attribute setting for LineString and Polygon
             if qgs_geometry.length() >= Epsilon.ZERO_RELATIVE:
-                if qgs_geometry.isClosed():  # Closed LineString
-                    if abs(qgs_geometry.sumUpArea()) > Epsilon.ZERO_RELATIVE:
-                        self.need_pivot = True
-                    else:
-                        self.is_simplest = True  # Zero area polygon (degenerated).  Do not try to simplify
+                if qgs_geometry.isClosed():
+                    self.need_pivot = True  # A closed lined string can be pivoted
             else:
-                self.is_simplest = True  # Zero length line (degenerated). Do not try to simplify
-        elif self.original_geom_type == QgsWkbTypes.Polygon:
-            qgs_polygon = QgsPolygon(qgs_geometry.clone())  # Create QgsPolygon to calculate area
-            if qgs_polygon.area() > Epsilon.ZERO_RELATIVE:
-                self.need_pivot = True
-            else:
-                self.is_simplest = True  # Zero area polygon. Do not simplify the closed line
+                self.is_simplest = True  # Degenerated LineString... Do not try to simplify...
+
+    def delete(self):
+
+        del self.id
+        del self.original_geom_type
+        del self.is_simplest
+        del self.qgs_geom
+        del self.bends
+        del self.need_pivot
+
+
 
 class SimGeom:
     """Class defining the line string used for the douglas peucker simplification"""
@@ -729,14 +774,13 @@ class GeoSimUtil:
             # de_9im_pattern[0] == '0' means that their interiors intersect (crosses)
             # de_9im_pattern[1] == '0' means that one extremity is touching the interior of the other (touches)
             if de_9im_pattern[0] == '0' or de_9im_pattern[1] == '0':
-                # The new sub line intersect or touch with itself. The result would create a non OGC simple line
                 constraints_valid = False
                 break
 
         return constraints_valid
 
     @staticmethod
-    def validate_intersection(qgs_geom_with_others, qgs_geom_new_subline):
+    def validate_intersection(qgs_geoms_with_others, qgs_geom_new_subline):
         """Validate the intersection constraint
 
         This constraint assure that the new sub line is not intersecting with any other lines (not itself)
@@ -748,11 +792,14 @@ class GeoSimUtil:
         """
 
         constraints_valid = True
-        for qgs_geom_potential in qgs_geom_with_others:
-            if not qgs_geom_potential.disjoint(qgs_geom_new_subline):
-                # The bend area intersects with a point
-                constraints_valid = False
-                break
+        if len(qgs_geoms_with_others) >= 1:
+            geom_engine_subline = QgsGeometry.createGeometryEngine(qgs_geom_new_subline.constGet().clone())
+            for qgs_geom_potential in qgs_geoms_with_others:
+                de_9im_pattern = geom_engine_subline.relate(qgs_geom_potential.constGet().clone())
+                # de_9im_pattern[0] == '0' means that their interiors intersect (crosses)
+                if de_9im_pattern[0] == '0':
+                    constraints_valid = False
+                    break
 
         return constraints_valid
 
@@ -777,27 +824,3 @@ class GeoSimUtil:
                 break
 
         return constraints_valid
-
-    @staticmethod
-    def create_gs_feature(qgs_in_features):
-        """Create the different GsFeatures from the QgsFeatures.
-
-        :return: List of rb_features
-        :rtype: [GsFeature]
-        """
-
-        gs_features = []
-
-        for qgs_feature in qgs_in_features:
-            qgs_geom = qgs_feature.geometry()  # extract the Geometry
-
-            if GsFeature.is_polygon(qgs_geom.wkbType()):
-                gs_features.append(GsPolygon(qgs_feature))
-            elif GsFeature.is_line_string(qgs_geom.wkbType()):
-                gs_features.append(GsLineString(qgs_feature))
-            elif GsFeature.is_point(qgs_geom.wkbType()):
-                gs_features.append(GsPoint(qgs_feature))
-            else:
-                raise QgsProcessingException("Internal geometry error")
-
-        return gs_features
