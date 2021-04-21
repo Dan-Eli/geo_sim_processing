@@ -170,10 +170,6 @@ class ReduceBendAlgorithm(QgsProcessingAlgorithm):
         if source_in is None:
             raise QgsProcessingException(self.invalidSourceError(parameters, "INPUT"))
 
-        from guppy import hpy
-        h = hpy()
-        print(h.heap())
-
         # Transform the in source into a vector layer
         vector_layer_in = source_in.materialize(QgsFeatureRequest(), feedback)
 
@@ -224,10 +220,6 @@ class ReduceBendAlgorithm(QgsProcessingAlgorithm):
         # Free some memory
         del qgs_features_in
         del rb_return
-
-        from guppy import hpy
-        h = hpy()
-        print(h.heap())
 
         return {"OUTPUT": dest_id}
 
