@@ -222,7 +222,7 @@ class Test(unittest.TestCase):
         title = "Test 12: Degenerated line"
         qgs_geom0 = create_line([(10, 10), (10, 20), (10,10)])
         qgs_feature_out = build_and_launch(title, [qgs_geom0], 3)
-        out_qgs_geom0 = create_line([(10, 10), (10,20), (10,10)])
+        out_qgs_geom0 = create_line([(10, 10), (10,10)])
         val0 = out_qgs_geom0.equals(qgs_feature_out[0])
         self.assertTrue(val0, title)
 
@@ -463,9 +463,18 @@ class Test(unittest.TestCase):
         val0 = qgs_geom0.equals(qgs_feature_out[0])
         self.assertTrue(val0, title)
 
-
     def test_case32(self):
-        title = "Test 32: Normalization of in vector layer"
+        title = "Test 31: Non simple line"
+        coord0 = [(0,0), (5,0), (4,1), (6,1), (5,0), (10,0)]
+        qgs_geom0 = create_line(coord0)
+        qgs_feature_out = build_and_launch(title, [qgs_geom0], 3)
+        coord0 = [(0,0), (10,0)]
+        qgs_geom0 = create_line(coord0)
+        val0 = qgs_geom0.equals(qgs_feature_out[0])
+        self.assertTrue(val0, title)
+
+    def test_case33(self):
+        title = "Test 33: Normalization of in vector layer"
         print (title)
         vl = QgsVectorLayer("LineString", "temporary_polygon", "memory")
         pr = vl.dataProvider()

@@ -191,7 +191,7 @@ class Test(unittest.TestCase):
         title = "Test 10: Closed line in form of a square"
         qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (0,0)], [])
         qgs_feature_out = build_and_launch(title,[qgs_geom0], 10)
-        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (0,0)], [])
+        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (0,0)], [])
         val0 = out_qgs_geom0.equals(qgs_feature_out[0])
         self.assertTrue (val0, title)
 
@@ -199,7 +199,7 @@ class Test(unittest.TestCase):
         title = "Test 11: Closed line in form of a square"
         qgs_geom0 = create_polygon([(0, 0), (0,5), (3,6), (5,5), (5,0), (0,0)], [])
         qgs_feature_out = build_and_launch(title,[qgs_geom0], 10)
-        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (0,0)], [])
+        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (0,0)], [])
         val0 = out_qgs_geom0.equals(qgs_feature_out[0])
         self.assertTrue (val0, title)
 
@@ -207,7 +207,7 @@ class Test(unittest.TestCase):
         title = "Test 12: Closed line in form of a square"
         qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (2,1), (0,0)], [])
         qgs_feature_out = build_and_launch(title,[qgs_geom0], 10)
-        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,0), (0,0)], [])
+        out_qgs_geom0 = create_polygon([(0, 0), (0,5), (5,5), (5,0), (0,0)], [])
         val0 = out_qgs_geom0.equals(qgs_feature_out[0])
         self.assertTrue (val0, title)
 
@@ -312,6 +312,85 @@ class Test(unittest.TestCase):
         val1 = out_qgs_geom1.equals(qgs_feature_out[1])
         self.assertTrue (val0 and val1, title)
 
+    def test_case23(self):
+        title = "Test 23: Two disjoint open line string with extremity touching ==> simplified"
+        qgs_geom0 = create_line([(0,0), (2,2), (4,0)])
+        qgs_geom1 = create_line([(6,0), (8,2), (10,0)])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0, qgs_geom1], 3)
+        out_qgs_geom0 = create_line([(0, 0), (4,0)])
+        out_qgs_geom1 = create_line([(6, 0), (10,0)])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        val1 = out_qgs_geom1.equals(qgs_feature_out[1])
+        self.assertTrue (val0 and val1, title)
+
+    def test_case24(self):
+        title = "Test 24: Two open line string with extremity touching ==> simplified"
+        qgs_geom0 = create_line([(0,0), (2,2), (4,0)])
+        qgs_geom1 = create_line([(4,0), (6,2), (8,0)])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0, qgs_geom1], 3)
+        out_qgs_geom0 = create_line([(0, 0), (4,0)])
+        out_qgs_geom1 = create_line([(4, 0), (8,0)])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        val1 = out_qgs_geom1.equals(qgs_feature_out[1])
+        self.assertTrue (val0 and val1, title)
+
+    def test_case25(self):
+        title = "Test 25: Two open line string with one extremity touching the middle of the other line: simplified"
+        qgs_geom0 = create_line([(0,0), (2,2), (4,0)])
+        qgs_geom1 = create_line([(-2,0), (2,0)])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0, qgs_geom1], 3)
+        out_qgs_geom0 = create_line([(0, 0), (4,0)])
+        out_qgs_geom1 = create_line([(-2, 0), (2,0)])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        val1 = out_qgs_geom1.equals(qgs_feature_out[1])
+        self.assertTrue (val0 and val1, title)
+
+    def test_case26(self):
+        title = "Test 26: Two open line with one extremity superimposed in the middle of the other line: simplified"
+        qgs_geom0 = create_line([(0,0), (2,2), (4,0)])
+        qgs_geom1 = create_line([(1,0), (3,0)])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0, qgs_geom1], 3)
+        out_qgs_geom0 = create_line([(0, 0), (4,0)])
+        out_qgs_geom1 = create_line([(1, 0), (3,0)])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        val1 = out_qgs_geom1.equals(qgs_feature_out[1])
+        self.assertTrue (val0 and val1, title)
+
+    def test_case27(self):
+        title = "Test 27: One open line with with duplicate points: simplified"
+        qgs_geom0 = create_line([(0,0), (2,2), (2,2), (4,0)])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0], 3)
+        out_qgs_geom0 = create_line([(0, 0), (4,0)])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        self.assertTrue (val0, title)
+
+    def test_case28(self):
+        title = "Test 28: One open line with with duplicate points: simplified"
+        qgs_geom0 = create_line([(0,0), (0,0), (2,2), (2,2), (2,2), (4,0), (4,0)])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0], 3)
+        out_qgs_geom0 = create_line([(0, 0), (4,0)])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        self.assertTrue (val0, title)
+
+    def test_case29(self):
+        title = "Test 29: Different degenerated line string (points identical)"
+        qgs_geom0 = create_line([(0,0), (0,0)])
+        qgs_geom1 = create_line([(10, 10), (10, 10), (10,10)])
+        qgs_geom2 = create_line([(20, 20), (20, 20), (20, 20), (20,20)])
+        qgs_geom3 = create_line([(30, 30), (30, 30), (30, 30), (30, 30), (30, 30)])
+        qgs_geom4 = create_line([(40, 40), (40, 40), (40, 40), (40, 40), (40, 40), (40,40)])
+        qgs_feature_out = build_and_launch(title,[qgs_geom0, qgs_geom1, qgs_geom2, qgs_geom3, qgs_geom4,],15)
+        out_qgs_geom0 = create_line([(0, 0), (0, 0)])
+        out_qgs_geom1 = create_line([(10, 10), (10, 10), (10, 10)])
+        out_qgs_geom2 = create_line([(20, 20), (20, 20), (20, 20), (20, 20)])
+        out_qgs_geom3 = create_line([(30, 30), (30, 30), (30, 30), (30, 30), (30, 30)])
+        out_qgs_geom4 = create_line([(40, 40), (40, 40), (40, 40), (40, 40), (40, 40), (40, 40)])
+        val0 = out_qgs_geom0.equals(qgs_feature_out[0])
+        val1 = out_qgs_geom1.equals(qgs_feature_out[1])
+        val2 = out_qgs_geom2.equals(qgs_feature_out[2])
+        val3 = out_qgs_geom3.equals(qgs_feature_out[3])
+        val4 = out_qgs_geom4.equals(qgs_feature_out[4])
+        self.assertTrue (val0 and val1 and val2 and val3 and val4, title)
 
 
 
