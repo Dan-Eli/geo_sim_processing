@@ -124,9 +124,7 @@ Simplify is a geospatial simplification (generalization) tool for lines and poly
 
 Note: While most GIS tools will handle and display invalid geometries like figure 6b, some spatial operation will not be allowed and this is why it's important to keep validity of the geometry after a simplification operation.
 
-![figure6a](/image/figure6a.png "Figure 6a") ![figure6b](/image/figure6b.png "Figure 6b")
-
-        Figure 6a                    Figure 6b
+![figure6a](/image/Figure6.png " ")
 
 
 ## Usage
