@@ -116,9 +116,10 @@ Chordal Axis can be used for skeleton extraction and polygon to line transformat
 Figure 5
 
 
-# Simplifier
+# Simplify
 
-Simplify is a geospatial simplification tool for lines and polygons. Simplify implements QGIS's QgsTopologyPreservingSimplifier tool. For line and polygon simplification that tool implements an algorithm similar to the Douglas Peucker algorithm. The implementation preserves the topology within one vector feature but not between vector features. There is also a known bug where the algorithm may create invalid topologies if there are components which are small relative to the tolerance value. In particular, if a small interior hole is very close to an edge, the resulting simplification may result in the hole being moved outside the polygon. This algorithm will detect these situations where one or more rings (interior parts) fall outside the polygon after being simplified and make the polygon invalid. The algoritm will remove (delete) these ring(s) so the feature remains valid after simplification.
+Simplify is a geospatial simplification (generalization) tool for lines and polygons. Simplify implements the classic Douglas-Peucker algorithm with spatial constraints validation during geometry simplification.  Simplify will preserve Simplicity (within the geometry), Intersection and Sidedness
+.
 
 
 Note: While most GIS tools will handle and display invalid geometries like figure 6b, some spatial operation will not be allowed and this is why it's important to keep validity of the geometry after a simplification operation.
@@ -138,6 +139,6 @@ Simplifier is a processing script dicoverable in the QGIS Processing Tool Box un
 
 **Simplified**: The simplified Line String or Polygon Layer
 
-## How it works
+## Rule of thumb for the use of Simplify
 
-Simplifier is an excellent tool to remove vertices on features with high vertex densities.  Try it with small tolerance value and then use [Reduce Bend](#Reduce-Bend) to [generalize features](#Line-Simplification-versus-Line-Generalization).
+Simplify (Douglas-Peucker) is an excellent tool to remove vertices on features with high vertex densities while preserving spatial relations between geometries.  Try it with small tolerance value and then use [Reduce Bend](#Reduce-Bend) to [generalize features](#Line-Simplification-versus-Line-Generalization).

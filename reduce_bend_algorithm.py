@@ -99,7 +99,7 @@ class ReduceBendAlgorithm(QgsProcessingAlgorithm):
     question will often be what diameter should we use? A good starting point is the cartographic rule of \
     thumb -- the .5mm on the map -- which says that the minimum distance between two lines should be \
     greater than 0.5mm on a paper map. So to simplify (generalize) a line for representation at a scale of \
-    1:50 000 for example a diameter of 25m should be a good starting point
+    1:50 000 for example a diameter of 25m should be a good starting point.
 
     """
 
