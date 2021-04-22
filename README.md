@@ -54,7 +54,7 @@ For each bend of a line or polygon ring, Reduce Bend calculates an adjusted area
 
 ![Figure1](/image/figure1.png)
 
-## Preserving topological relationship
+## Preserving Topological Relationship
 Before any bend simplifcation is applied, Reduce Bend will always analyze the following 3 topological relationships to ensure they are not affected by the simplification operation: simplicity, intersection and sidedness.  If simplification alters any of those relationships, then it is not performed.  Thereby Reduce Bend preserves the existing relative topology between the geospatial features to simplify.  
 
 ### Simplicity
@@ -117,7 +117,7 @@ Figure 5
 
 # Simplify
 
-Simplify is a geospatial simplification (generalization) tool for lines and polygons. Simplify implements an enhanced version of the classic Douglas-Peucker algorithm with spatial constraints validation during geometry simplification.  Simplify will preserve the following [topologicial relationships](##Preserving topological relationship##):  Simplicity (within the geometry), Intersection (with other geometries) and Sidedness (with other geometries).
+Simplify is a geospatial simplification (generalization) tool for lines and polygons. Simplify implements an enhanced version of the classic Douglas-Peucker algorithm with spatial constraints validation during geometry simplification.  Simplify will preserve the following [topologicial relationships](#Preserving-Topological-Relationship):  Simplicity (within the geometry), Intersection (with other geometries) and Sidedness (with other geometries).
 
 
 The figure 6  below shows the difference between the regular and the enhanced version of the classic Douglas-Peucker algorithm. Figure 6a represent the original contours.  Figure 6b represent the results of the simplified contours with line intersections showed by the red dots using the classic Douglas-Peucker.  Figure 6c represent the results of the simplified contours without line intersections using the enhanced version of the classic Douglas-Peucker. Figure 6b et 6c are using the same simplifiction tolerance. 
