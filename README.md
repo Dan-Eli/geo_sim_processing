@@ -125,7 +125,7 @@ The figure 6  below shows the difference between the regular and the improved ve
 
 ![figure6a](/image/Figure6-abc.png "Figure 6abc")
 
-    Figure 6a: Original contour         Figure 6b: Classic Douglas-Peucker    Figure 6c: Improved Douglas-Peucker
+    Figure 6a: Original contour           Figure 6b: Classic Douglas-Peucker    Figure 6c: Improved Douglas-Peucker
 
 ## Usage
 
