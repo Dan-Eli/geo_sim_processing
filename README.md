@@ -113,7 +113,7 @@ Chordal Axis can be used for skeleton extraction and polygon to line transformat
 
 ![figure4](/image/figure4.png)
 
-Figure 5
+&nbsp;Figure 5
 
 
 # Simplify
@@ -123,9 +123,9 @@ Simplify is a geospatial simplification (generalization) tool for lines and poly
 
 The figure 6  below shows the difference between the regular and the improved version of the classic Douglas-Peucker algorithm. Figure 6a represent the original contours.  Figure 6b represent the results of the simplified contours with line intersections showed by the red dots using the regular or classic Douglas-Peucker.  Figure 6c represent the results of the simplified contours without line intersections using the improved version of the classic Douglas-Peucker. Figure 6b et 6c are using the same simplifiction tolerance. 
 
-![figure6a](/image/Figure6-abc.png)
+![figure6a](/image/Figure6-abc.png "Figure 6a: Original contour Figure 6b: Classic Douglas-Peucker Figure 6c: Improved Douglas-Peucker")
 
-     Figure 6a: Original contour        Figure 6b: Classic Douglas-Peucker         Figure 6c: Improved Douglas-Peucker
+
 
 ## Usage
 
