@@ -125,15 +125,15 @@ The figure 6  below shows the difference between the regular and the improved ve
 
 ![figure6a](/image/Figure6-abc.png "Figure 6abc")
 
-    Figure 6a: Original contour           Figure 6b: Classic Douglas-Peucker    Figure 6c: Improved Douglas-Peucker
+     Figure 6a: Original contour            Figure 6b: Classic Douglas-Peucker     Figure 6c: Improved Douglas-Peucker
 
 ## Usage
 
 Simplify is a processing script dicoverable in the QGIS Processing Tool Box under Geo Simplification
 
-**Input layer**: The Line String or Polygon layer to simplify
+**Input layer**: The Line String or Polyg on layer to simplify
 
-**Tolerance**: The tolerance in ground unit used by the Douglas-Peucker algorithm
+**Tolerance**: The tole rance in ground unit used by the Douglas-Peucker algorithm
 
 **Simplified**: The simplified Line String or Polygon Layer
 
