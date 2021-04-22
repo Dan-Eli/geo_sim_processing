@@ -120,8 +120,7 @@ Chordal Axis can be used for skeleton extraction and polygon to line transformat
 
 Simplify is a geospatial simplification (generalization) tool for lines and polygons. Simplify implements an improved version of the classic Douglas-Peucker algorithm with spatial constraints validation during geometry simplification.  Simplify will preserve the following [topologicial relationships](#Preserving-Topological-Relationship):  Simplicity (within the geometry), Intersection (with other geometries) and Sidedness (with other geometries).
 
-
-The figure 6  below shows the difference between the regular and the improved version of the classic Douglas-Peucker algorithm. Figure 6a represent the original contours.  Figure 6b represent the results of the simplified contours with line intersections showed by the red dots using the regular or classic Douglas-Peucker.  Figure 6c represent the results of the simplified contours without line intersections using the improved version of the classic Douglas-Peucker. Figure 6b et 6c are using the same simplifiction tolerance. 
+The figure 6  below shows the differences between the regular and the improved version of the classic Douglas-Peucker algorithm. Figure 6a represents the original contours.  Figure 6b represents the results of the simplified contours using the classic Douglas-Peucker algorithm with line intersections identified by the red dots.  Figure 6c represents the results of the simplified contours using the improved version of the Douglas-Peucker algorithm without line intersection. Results of Figure 6b and 6c used the same simplifiction tolerance. 
 
 ![figure6a](/image/Figure6-abc.png "Figure 6abc")
      Figure 6a: Original contour            Figure 6b: Classic Douglas-Peucker     Figure 6c: Improved Douglas-Peucker
@@ -130,12 +129,12 @@ The figure 6  below shows the difference between the regular and the improved ve
 
 Simplify is a processing script dicoverable in the QGIS Processing Tool Box under Geo Simplification
 
-**Input layer**: The Line String or Polyg on layer to simplify
+**Input layer**: The Line String or Polygon layer to simplify
 
-**Tolerance**: The tole rance in ground unit used by the Douglas-Peucker algorithm
+**Tolerance**: The tolerance in ground unit used by the Douglas-Peucker algorithm
 
 **Simplified**: The simplified Line String or Polygon Layer
 
 ## Rule of thumb for the use of Simplify
 
-Simplify (Douglas-Peucker) is an excellent tool to remove vertices on features with high vertex densities while preserving spatial relations between geometries.  Try it with small tolerance value and then use [Reduce Bend](#Reduce-Bend) to [generalize features](#Line-Simplification-versus-Line-Generalization).
+Simplify (Douglas-Peucker) is an excellent tool to remove vertices on features with high vertex densities while preserving a maximum of details within the geometries.  Try it with small tolerance value and then use [Reduce Bend](#Reduce-Bend) to [generalize features](#Line-Simplification-versus-Line-Generalization).
