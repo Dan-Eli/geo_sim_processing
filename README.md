@@ -41,7 +41,6 @@ Reduce Bend is a processing script dicoverable in the QGIS Processing Tool Box u
 *Line Simplification* is the process of removing vertices in a line while trying to keep the maximum number of details within the line whereas *Line Generalization* is the process of removing meaningless (unwanted) details in a line usually for scaling down.  The well known Douglas-Peucker algorithm is a very good example of line simplification tool and Reduce Bend falls more in the category of line generalization tools. Keep in mind thay both algorithms can be complementary because Reduce Bend will not remove unnecessary vertices in the case of very high densities of vertices.  It may be a good idea to use [Simplify](#Simplify) before Reduce Bend in the case of very densed geometries.
 
 ## How it works
-
 Reduce Bend will simplify (generalize) lines as well as polygons.  Reduce Bend consists of three main steps: detect bends, determine which bends to simplify and preserve the topological (spatial) relationships.  These 3 steps are detailed below.
 
 * __Detecting bends__ -
@@ -55,7 +54,7 @@ For each bend of a line or polygon ring, Reduce Bend calculates an adjusted area
 
 ![Figure1](/image/figure1.png)
 
-* __Preserving topological relationship__ -
+## Preserving topological relationship
 Before any bend simplifcation is applied, Reduce Bend will always analyze the following 3 topological relationships to ensure they are not affected by the simplification operation: simplicity, intersection and sidedness.  If simplification alters any of those relationships, then it is not performed.  Thereby Reduce Bend preserves the existing relative topology between the geospatial features to simplify.  
 
 ### Simplicity
@@ -118,7 +117,7 @@ Figure 5
 
 # Simplify
 
-Simplify is a geospatial simplification (generalization) tool for lines and polygons. Simplify implements an enhanced version of the classic Douglas-Peucker algorithm with spatial constraints validation during geometry simplification.  Simplify will preserve the following [topologicial relationships](__Preserving topological relationship__):  Simplicity (within the geometry), Intersection (with other geometries) and Sidedness (with other geometries).
+Simplify is a geospatial simplification (generalization) tool for lines and polygons. Simplify implements an enhanced version of the classic Douglas-Peucker algorithm with spatial constraints validation during geometry simplification.  Simplify will preserve the following [topologicial relationships](##Preserving topological relationship##):  Simplicity (within the geometry), Intersection (with other geometries) and Sidedness (with other geometries).
 
 
 The figure 6  below shows the difference between the regular and the enhanced version of the classic Douglas-Peucker algorithm. Figure 6a represent the original contours.  Figure 6b represent the results of the simplified contours with line intersections showed by the red dots using the classic Douglas-Peucker.  Figure 6c represent the results of the simplified contours without line intersections using the enhanced version of the classic Douglas-Peucker. Figure 6b et 6c are using the same simplifiction tolerance. 
