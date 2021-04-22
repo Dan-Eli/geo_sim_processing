@@ -1,6 +1,9 @@
 # geo_sim_processing
 
-geo_sim_processing is a QGIS plugin that aims to simplify/generalize line and polygon features. It is composed of 3 tools: [Reduce Bend](#Reduce-Bend), [Chordal Axis](#Chordal-Axis) and [Simplify](#Simplify)
+geo_sim_processing is a QGIS plugin that aims to simplify/generalize line and polygon features. It is composed of 3 processing tools: 
+ - [Reduce Bend](#Reduce-Bend) for line simplification and generalization
+ - [Chordal Axis](#Chordal-Axis) for polygon to line simplification (skeletenization)
+ - [Simplify](#Simplify) for line simplification
 
 ## Requirements  
 - [QGIS](https://www.qgis.org) >3.14
@@ -27,8 +30,6 @@ Reduce Bend is a processing script dicoverable in the QGIS Processing Tool Box u
 **Smooth line**:          If you want to smooth the reduced bends (when possible).
 
 **Diameter tolerance**:   Diameter of the minimum adjusted area bend to simplify (to remove) in ground units
-
-**Verbose**:              Flag for extra information
 
 **Exclude polygon**:      Exclude (delete) polygons exteriors below the minimum adjusted area (delete also any interior holes if present)
 
@@ -117,10 +118,10 @@ Figure 5
 
 # Simplify
 
-Simplify is a geospatial simplification (generalization) tool for lines and polygons. Simplify implements an enhanced version of the classic Douglas-Peucker algorithm with spatial constraints validation during geometry simplification.  Simplify will preserve the following [topologicial relationships](#Preserving-Topological-Relationship):  Simplicity (within the geometry), Intersection (with other geometries) and Sidedness (with other geometries).
+Simplify is a geospatial simplification (generalization) tool for lines and polygons. Simplify implements an improved version of the classic Douglas-Peucker algorithm with spatial constraints validation during geometry simplification.  Simplify will preserve the following [topologicial relationships](#Preserving-Topological-Relationship):  Simplicity (within the geometry), Intersection (with other geometries) and Sidedness (with other geometries).
 
 
-The figure 6  below shows the difference between the regular and the enhanced version of the classic Douglas-Peucker algorithm. Figure 6a represent the original contours.  Figure 6b represent the results of the simplified contours with line intersections showed by the red dots using the classic Douglas-Peucker.  Figure 6c represent the results of the simplified contours without line intersections using the enhanced version of the classic Douglas-Peucker. Figure 6b et 6c are using the same simplifiction tolerance. 
+The figure 6  below shows the difference between the regular and the improved version of the classic Douglas-Peucker algorithm. Figure 6a represent the original contours.  Figure 6b represent the results of the simplified contours with line intersections showed by the red dots using the regular or classic Douglas-Peucker.  Figure 6c represent the results of the simplified contours without line intersections using the improved version of the classic Douglas-Peucker. Figure 6b et 6c are using the same simplifiction tolerance. 
 
 ![figure6a](/image/Figure6.png " ")
 
@@ -131,7 +132,7 @@ Simplify is a processing script dicoverable in the QGIS Processing Tool Box unde
 
 **Input layer**: The Line String or Polygon layer to simplify
 
-**Tolerance**: The tolerance in ground unit used to simplify the line
+**Tolerance**: The tolerance in ground unit used by the Douglas-Peucker algorithm
 
 **Simplified**: The simplified Line String or Polygon Layer
 
