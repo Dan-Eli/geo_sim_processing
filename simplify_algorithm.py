@@ -77,12 +77,10 @@ class SimplifyAlgorithm(QgsProcessingAlgorithm):
         """Returns a localised short help string for the algorithm.
         """
         help_str = """
-    Simplify is a geospatial simplification and generalization tool for lines and polygons. The \
-    particularity of this algorithm is that for each line or polygon it analyzes its bends (curves) and \
-    decides which one to reduce, trying to emulate what a cartographer would do manually \
-    to simplify or generalize a line. Reduce bend will accept lines and polygons as input.  Reduce bend will \
-    preserve the topology (spatial relations) within and between the features during the bend reduction. \
-    Reduce bend also accept multi lines and multi polygons but will output lines and polygons.
+    Simplify is a geospatial simplification (generalization) tool for lines and polygons. Simplify \
+    implements an improved version of the classic Douglas-Peucker algorithm with spatial constraints \
+    validation during geometry simplification.  Simplify will preserve the following topological relationships:  \
+    Simplicity (within the geometry), Intersection (with other geometries) and Sidedness (with other geometries).
 
     <b>Usage</b>
     <u>Input layer</u> : Any LineString or Polygon layer.  Multi geometry are transformed into single part geometry.
@@ -90,11 +88,9 @@ class SimplifyAlgorithm(QgsProcessingAlgorithm):
     <u>Simplified</u> : Output layer of the algorithm.
 
     <b>Rule of thumb for the diameter tolerance</b>
-    Reduce bend can be used for line simplifying in the context of line generalization. The big \
-    question will often be what diameter should we use? A good starting point is the cartographic rule of \
-    thumb -- the .5mm on the map -- which says that the minimum distance between two lines should be \
-    greater than 0.5mm on a paper map. So to simplify (generalize) a line for representation at a scale of \
-    1:50 000 for example a diameter of 25m should be a good starting point
+    Simplify (Douglas-Peucker) is an excellent tool to remove vertices on features with high vertex densities \
+    while preserving a maximum of details within the geometries.  Try it with small tolerance value and then use \
+    Reduce Bend to generalize features (generalization is needed).
 
     """
 
