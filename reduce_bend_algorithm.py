@@ -36,9 +36,9 @@ from qgis.core import (QgsProcessing, QgsProcessingAlgorithm, QgsProcessingParam
                        QgsProcessingParameterFeatureSource, QgsProcessingParameterFeatureSink,
                        QgsProcessingParameterBoolean, QgsFeatureSink, QgsFeatureRequest, QgsPoint,
                        QgsPointXY, QgsLineString, QgsPolygon, QgsWkbTypes, QgsGeometry,
-                       QgsGeometryUtils, QgsRectangle, QgsProcessingException, QgsMultiPolygon)
+                       QgsGeometryUtils, QgsProcessingException, QgsMultiPolygon)
 import processing
-from .geo_sim_util import Epsilon, GsCollection, GsFeature, GsPolygon, GsLineString, GsPoint, Bend, GeoSimUtil
+from .geo_sim_util import Epsilon, GsCollection, GsFeature, GsPolygon, Bend, GeoSimUtil
 
 
 class ReduceBendAlgorithm(QgsProcessingAlgorithm):
@@ -850,10 +850,6 @@ class ReduceBend:
         # Create the list of GsPolygon, GsLineString and GsPoint to process
         self.rb_features = GsFeature.create_gs_feature(self.qgs_in_features)
         self.rb_results.in_nbr_features = len(self.qgs_in_features)
-
-        for qgs_in_feature in self.qgs_in_features:
-            qgs_in_feature = None
-        del self.qgs_in_features
 
         # Pre process the LineString: remove to close point and co-linear points
         self.rb_geoms = self.pre_reduction_process()

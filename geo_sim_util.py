@@ -29,7 +29,7 @@ QGIS Plugin for Bend reduction
 import math
 import sys
 from abc import ABC, abstractmethod
-from qgis.core import (QgsFeature, QgsLineString, QgsWkbTypes, QgsSpatialIndex, QgsGeometry, QgsPolygon,
+from qgis.core import (QgsLineString, QgsWkbTypes, QgsSpatialIndex, QgsGeometry, QgsPolygon,
                        QgsGeometryUtils, QgsRectangle, QgsProcessingException)
 
 
@@ -66,7 +66,7 @@ class Epsilon:
         delta_y = abs(b_box.yMinimum()) + abs(b_box.yMaximum())
         dynamic_xy = max(delta_x, delta_y)  # Dynamic of the bounding box
         log_loss = int(math.log(dynamic_xy, 10)+1)
-        max_digit = 15  # Number of significative digits for real number
+        max_digit = 15  # Number of meaningful digits for real number
         security = 2  # Keep 2 order of magnitude of security
         abs_digit = max_digit - security
         rel_digit = max_digit - log_loss - security
@@ -116,17 +116,17 @@ class GsCollection:
 
         return self._id_qgs_segment
 
-    def _create_rectangle(self, id, qgs_geom):
+    def _create_rectangle(self, geom_id, qgs_geom):
         """Creates a new QgsRectangle to load in the QgsSpatialIndex.
 
-        :param id: Integer ID of the geometry
+        :param geom_id: Integer ID of the geometry
         :param: qgs_geom: QgsGeometry to use for bounding box extraction
         :return: The feature created
         :rtype: QgsFeature
         """
 
         id_segment = self._get_next_id_segment()
-        self._dict_qgs_segment[id_segment] = (id, qgs_geom)  # Reference to the RbGeom ID and geometry
+        self._dict_qgs_segment[id_segment] = (geom_id, qgs_geom)  # Reference to the RbGeom ID and geometry
 
         return id_segment, qgs_geom.boundingBox()
 
@@ -149,8 +149,8 @@ class GsCollection:
                     qgs_geom = QgsGeometry(QgsLineString(qgs_points[i], qgs_points[i+1]))
                     qgs_rectangles.append(self._create_rectangle(rb_geom.id, qgs_geom))
 
-            for id, qgs_rectangle in qgs_rectangles:
-                self._spatial_index.addFeature(id, qgs_rectangle)
+            for geom_id, qgs_rectangle in qgs_rectangles:
+                self._spatial_index.addFeature(geom_id, qgs_rectangle)
 
         return
 
@@ -171,8 +171,8 @@ class GsCollection:
         qgs_geoms_with_others = []
         qgs_rectangle.grow(Epsilon.ZERO_RELATIVE*100.)  # Always increase the b_box to avoid degenerated b_box
         ids = self._spatial_index.intersects(qgs_rectangle)
-        for id in ids:
-            target_qgs_geom_id, target_qgs_geom = self._dict_qgs_segment[id]
+        for geom_id in ids:
+            target_qgs_geom_id, target_qgs_geom = self._dict_qgs_segment[geom_id]
             if target_qgs_geom_id is None:
                 # Nothing to do; segment was deleted
                 pass
@@ -192,6 +192,7 @@ class GsCollection:
         To minimise the number of feature returned we search for a very small bounding box located in the middle
         of the line segment.  Usually only one line segment is returned.
 
+        :param qgs_geom_id: Integer ID of the geometry
         :param qgs_pnt0 : QgsPoint start point of the target line segment.
         :param qgs_pnt1 : QgsPoint end point of the target line segment.
         """
@@ -202,13 +203,13 @@ class GsCollection:
         qgs_rectangle.grow(Epsilon.ZERO_RELATIVE*100)
         deleted = False
         ids = self._spatial_index.intersects(qgs_rectangle)
-        for id in ids:
-            target_qgs_geom_id, target_qgs_geom = self._dict_qgs_segment[id]  # Extract id and geometry
+        for geom_id in ids:
+            target_qgs_geom_id, target_qgs_geom = self._dict_qgs_segment[geom_id]  # Extract id and geometry
             if qgs_geom_id == target_qgs_geom_id:
                 # Only check for the same ID
-                if target_qgs_geom.equals(qgs_geom_to_delete):  #  Check if it's the same geometry
+                if target_qgs_geom.equals(qgs_geom_to_delete):  # Check if it's the same geometry
                     deleted = True
-                    self._dict_qgs_segment[id] = (None, None)  # Delete from the internal structure
+                    self._dict_qgs_segment[geom_id] = (None, None)  # Delete from the internal structure
                     break
 
         if not deleted:
@@ -247,8 +248,8 @@ class GsCollection:
         qgs_pnt0 = rb_geom.qgs_geom.vertexAt(v_ids_to_del[0])
         qgs_pnt1 = rb_geom.qgs_geom.vertexAt(v_ids_to_del[-1])
         qgs_geom_segment = QgsGeometry(QgsLineString(qgs_pnt0, qgs_pnt1))
-        id, qgs_rectangle = self._create_rectangle(rb_geom.id, qgs_geom_segment)
-        self._spatial_index.addFeature(id, qgs_rectangle)
+        geom_id, qgs_rectangle = self._create_rectangle(rb_geom.id, qgs_geom_segment)
+        self._spatial_index.addFeature(geom_id, qgs_rectangle)
 
         # Delete the vertex in the line string geometry
         for v_id_to_del in reversed(range(v_id_start, v_id_end+1)):
@@ -285,11 +286,9 @@ class GsCollection:
 
         # Add the new segment in the spatial container
         for i in range(len(qgs_points)-1):
-            qgs_pnt_a = qgs_points[i]
-            qgs_pnt_b = qgs_points[i+1]
-            qgs_geom_segment = QgsGeometry(QgsLineString(qgs_pnt_a, qgs_pnt_b))
-            id, qgs_rectangle = self._create_rectangle(rb_geom.id, qgs_geom_segment)
-            self._spatial_index.addFeature(id, qgs_rectangle)
+            qgs_geom_segment = QgsGeometry(QgsLineString(qgs_points[i], qgs_points[i+1]))
+            geom_id, qgs_rectangle = self._create_rectangle(rb_geom.id, qgs_geom_segment)
+            self._spatial_index.addFeature(geom_id, qgs_rectangle)
 
         return
 
@@ -470,12 +469,6 @@ class GsPolygon(GsFeature):
 
         return self.qgs_feature
 
-    def delete(self):
-
-        del self.qgs_feature
-        del self.id
-        del self.qgs_geom
-
 
 class GsLineString(GsFeature):
     """Class managing a GsLineString.
@@ -512,13 +505,6 @@ class GsLineString(GsFeature):
         self.qgs_feature.setGeometry(qgs_geom)
 
         return self.qgs_feature
-
-    def delete(self):
-
-        del self.qgs_feature
-        del self.id
-        del self.qgs_geom
-        del self.rb_geom
 
 
 class GsPoint(GsFeature):
@@ -560,13 +546,6 @@ class GsPoint(GsFeature):
         self.qgs_feature.setGeometry(qgs_geom)
 
         return self.qgs_feature
-
-    def delete(self):
-
-        del self.qgs_feature
-        del self.id
-        del self.qgs_geom
-        del self.rb_geom
 
 
 class RbGeom:
@@ -614,16 +593,6 @@ class RbGeom:
                     self.need_pivot = True  # A closed lined string can be pivoted
             else:
                 self.is_simplest = True  # Degenerated LineString... Do not try to simplify...
-
-    def delete(self):
-
-        del self.id
-        del self.original_geom_type
-        del self.is_simplest
-        del self.qgs_geom
-        del self.bends
-        del self.need_pivot
-
 
 
 class SimGeom:
